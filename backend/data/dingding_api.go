@@ -1,8 +1,10 @@
 package data
 
 import (
-	"github.com/go-resty/resty/v2"
 	"go-stock/backend/logger"
+
+	"github.com/duke-git/lancet/v2/strutil"
+	"github.com/go-resty/resty/v2"
 )
 
 // @Author spark
@@ -21,7 +23,7 @@ func NewDingDingAPI() *DingDingAPI {
 }
 
 func (DingDingAPI) SendDingDingMessage(message string) string {
-	if GetConfig().DingPushEnable == false {
+	if GetSettingConfig().DingPushEnable == false {
 		//logger.SugaredLogger.Info("钉钉推送未开启")
 		return "钉钉推送未开启"
 	}
@@ -37,14 +39,20 @@ func (DingDingAPI) SendDingDingMessage(message string) string {
 	logger.SugaredLogger.Infof("send dingding message: %s", resp.String())
 	return "发送钉钉消息成功"
 }
-func GetConfig() *Settings {
-	return NewSettingsApi(&Settings{}).GetConfig()
-}
+
 func getApiURL() string {
-	return GetConfig().DingRobot
+	return GetSettingConfig().DingRobot
 }
 
 func (DingDingAPI) SendToDingDing(title, message string) string {
+	message = strutil.ReplaceWithMap(message, map[string]string{
+		"\\n":   "\n",
+		"\\r":   "\r",
+		"\\t":   "\t",
+		"\\\\n": "\n",
+		"\\\\r": "\r",
+		"\\\\t": "\t",
+	})
 	// 发送钉钉消息
 	resp, err := resty.New().R().
 		SetHeader("Content-Type", "application/json").

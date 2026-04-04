@@ -5,10 +5,14 @@ on:
     tags:
     # Match any new tag
       - '*-release'
+      - '*-dev'
+      - '*-pre'
 
 env:
   # Necessary for most environments as build failure can occur due to OOM issues
   NODE_OPTIONS: "--max-old-space-size=4096"
+  OFFICIAL_STATEMENT: ${{ vars.OFFICIAL_STATEMENT }}
+  BUILD_KEY: ${{ vars.BUILD_KEY }}
 
 jobs:
   build:
@@ -20,9 +24,15 @@ jobs:
           - name: 'go-stock-windows-amd64.exe'
             platform:  'windows/amd64'
             os: 'windows-latest'
-#          - name: 'go-stock-linux-amd64'
-#            platform: 'linux/amd64'
-#            os: 'ubuntu-latest'
+          - name: 'go-stock-darwin-universal'
+            platform: 'darwin/universal'
+            os: 'macos-latest'
+          - name: 'go-stock-darwin-intel'
+            platform: 'darwin'
+            os: 'macos-latest'
+          - name: 'go-stock-darwin-arm64'
+            platform: 'darwin/arm64'
+            os: 'macos-latest'
 
     runs-on: ${{ matrix.build.os }}
     steps:
@@ -34,17 +44,18 @@ jobs:
       - name: Get commit message
         id: get_commit_message
         run: |
-          $commit_message = & git log -1 --pretty=format:"%s"
-          echo "::set-output name=commit_message::$commit_message"
+          echo "commit_message=$(git log -1 --pretty=format:'%s')" >> $GITHUB_OUTPUT
 
       - name: Build wails x go-stock
-        uses: ArvinLovegood/wails-build-action@v3.4
+        uses: ArvinLovegood/wails-build-action@v3.7
         id: build
         with:
           build-name: ${{ matrix.build.name }}
           build-platform: ${{ matrix.build.platform }}
           package: true
-          go-version: '1.24'
+          go-version: '1.26'
           build-tags: ${{ github.ref_name }}
           build-commit-message: ${{ steps.get_commit_message.outputs.commit_message }}
+          build-statement: ${{ env.OFFICIAL_STATEMENT }}
+          build-key: ${{ env.BUILD_KEY }}
           node-version: '20.x'

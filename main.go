@@ -5,24 +5,25 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"github.com/duke-git/lancet/v2/slice"
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/logger"
-	"github.com/wailsapp/wails/v2/pkg/menu"
-	"github.com/wailsapp/wails/v2/pkg/menu/keys"
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/mac"
-	"github.com/wailsapp/wails/v2/pkg/options/windows"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	assistantweb "go-stock/ai-assistant-web"
 	"go-stock/backend/data"
 	"go-stock/backend/db"
 	log "go-stock/backend/logger"
 	"go-stock/backend/models"
 	"os"
-	goruntime "runtime"
 	"runtime/debug"
 	"strings"
 	"time"
+
+	"github.com/duke-git/lancet/v2/convertor"
+	"github.com/duke-git/lancet/v2/slice"
+	"github.com/wailsapp/wails/v2"
+	"github.com/wailsapp/wails/v2/pkg/logger"
+	"github.com/wailsapp/wails/v2/pkg/menu"
+	"github.com/wailsapp/wails/v2/pkg/options"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
+	"github.com/wailsapp/wails/v2/pkg/options/windows"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 //go:embed frontend/dist
@@ -40,6 +41,9 @@ var alipay []byte
 //go:embed build/screenshot/wxpay.jpg
 var wxpay []byte
 
+//go:embed build/screenshot/扫码_搜索联合传播样式-白色版.png
+var wxgzh []byte
+
 //go:embed build/stock_basic.json
 var stocksBin []byte
 
@@ -53,10 +57,21 @@ var stocksBinUS []byte
 
 var Version string
 var VersionCommit string
+var OFFICIAL_STATEMENT string
+var BuildKey string
 
 func main() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.SugaredLogger.Error("panic: ", r)
+			log.SugaredLogger.Error("stack: ", string(debug.Stack()))
+		}
+	}()
+
 	checkDir("data")
+	data.SponsorDecryptKeyHex = BuildKey
 	db.Init("")
+	data.InitAnalyzeSentiment()
 	go AutoMigrate()
 
 	//db.Dao.Model(&data.Group{}).Where("id = ?", 0).FirstOrCreate(&data.Group{
@@ -64,81 +79,113 @@ func main() {
 	//	Sort: 0,
 	//})
 
+	log.SugaredLogger.Info("starting...")
+	log.SugaredLogger.Infof("version: %s  commit: %s", Version, VersionCommit)
+	//log.SugaredLogger.Infof("build key: %s", BuildKey)
+
+	// 程序启动时预缓存东财 Cookie
+	//go func() {
+	//	cacheCookies("https://push2his.eastmoney.com/api/qt/stock/kline/get")
+	//}()
+
 	// Create an instance of the app structure
 	app := NewApp()
 	AppMenu := menu.NewMenu()
-	FileMenu := AppMenu.AddSubmenu("设置")
-	FileMenu.AddText("显示搜索框", keys.CmdOrCtrl("s"), func(callbackData *menu.CallbackData) {
-		runtime.EventsEmit(app.ctx, "showSearch", 1)
-	})
-	FileMenu.AddText("隐藏搜索框", keys.CmdOrCtrl("d"), func(callbackData *menu.CallbackData) {
-		runtime.EventsEmit(app.ctx, "showSearch", 0)
-	})
-	FileMenu.AddText("刷新数据", keys.CmdOrCtrl("r"), func(callbackData *menu.CallbackData) {
-		//runtime.EventsEmit(app.ctx, "refresh", "setting-"+time.Now().Format("2006-01-02 15:04:05"))
-		runtime.EventsEmit(app.ctx, "refreshFollowList", "refresh-"+time.Now().Format("2006-01-02 15:04:05"))
-	})
-	FileMenu.AddSeparator()
-	FileMenu.AddText("窗口全屏", keys.CmdOrCtrl("f"), func(callback *menu.CallbackData) {
-		runtime.WindowFullscreen(app.ctx)
-	})
-	FileMenu.AddText("窗口还原", keys.Key("Esc"), func(callback *menu.CallbackData) {
-		runtime.WindowUnfullscreen(app.ctx)
-	})
-
-	if goruntime.GOOS == "windows" {
-		FileMenu.AddText("隐藏到托盘区", keys.CmdOrCtrl("h"), func(_ *menu.CallbackData) {
-			runtime.WindowHide(app.ctx)
-		})
-
-		FileMenu.AddText("显示", keys.CmdOrCtrl("v"), func(_ *menu.CallbackData) {
-			runtime.WindowShow(app.ctx)
-		})
+	if IsMacOS() {
+		AppMenu.Append(menu.EditMenu())
 	}
+	//FileMenu := AppMenu.AddSubmenu("设置")
+	//FileMenu.AddText("窗口全屏", keys.CmdOrCtrl("f"), func(callback *menu.CallbackData) {
+	//	runtime.WindowFullscreen(app.ctx)
+	//})
+	//FileMenu.AddText("窗口还原", keys.Key("Esc"), func(callback *menu.CallbackData) {
+	//	runtime.WindowUnfullscreen(app.ctx)
+	//})
+	//FileMenu.AddText("显示搜索框", keys.CmdOrCtrl("s"), func(callbackData *menu.CallbackData) {
+	//	runtime.EventsEmit(app.ctx, "showSearch", 1)
+	//})
+	//FileMenu.AddText("隐藏搜索框", keys.CmdOrCtrl("d"), func(callbackData *menu.CallbackData) {
+	//	runtime.EventsEmit(app.ctx, "showSearch", 0)
+	//})
+	//FileMenu.AddText("刷新数据", keys.CmdOrCtrl("r"), func(callbackData *menu.CallbackData) {
+	//	//runtime.EventsEmit(app.ctx, "refresh", "setting-"+time.Now().Format("2006-01-02 15:04:05"))
+	//	runtime.EventsEmit(app.ctx, "refreshFollowList", "refresh-"+time.Now().Format("2006-01-02 15:04:05"))
+	//})
+	//FileMenu.AddSeparator()
+
+	//if goruntime.GOOS == "windows" {
+	//	FileMenu.AddText("隐藏到托盘区", keys.CmdOrCtrl("z"), func(_ *menu.CallbackData) {
+	//		runtime.WindowHide(app.ctx)
+	//	})
+	//}
 
 	//FileMenu.AddText("退出", keys.CmdOrCtrl("q"), func(_ *menu.CallbackData) {
 	//	runtime.Quit(app.ctx)
 	//})
 	log.SugaredLogger.Info("version: " + Version)
 	log.SugaredLogger.Info("commit: " + VersionCommit)
-	// Create application with options
-	//var width, height int
-	//var err error
-	//
-	width, _, err := getScreenResolution()
+	// 根据屏幕分辨率自适应窗口尺寸
+	width, height, _, _, err := getScreenResolution()
 	if err != nil {
 		log.SugaredLogger.Error("get screen resolution error")
-		width = 1456
-		//height = 768
+		// 获取失败时给一个合理的默认值
+		width = 1412
+		height = 834
 	}
 
-	darkTheme := data.NewSettingsApi(&data.Settings{}).GetConfig().DarkTheme
+	darkTheme := data.GetSettingConfig().DarkTheme
 	backgroundColour := &options.RGBA{R: 255, G: 255, B: 255, A: 1}
 	if darkTheme {
 		backgroundColour = &options.RGBA{R: 27, G: 38, B: 54, A: 1}
 	}
 
+	//frameless := getFrameless()
+
+	// 计算默认窗口大小：优先使用上次保存的用户尺寸，否则自适应
+	config := data.GetSettingConfig()
+
+	appWidth := config.WindowWidth
+	appHeight := config.WindowHeight
+
+	// 若用户尚未调整过窗口或记录为 0，则按屏幕比例给一个合适默认值
+	if appWidth <= 0 || appHeight <= 0 {
+		appWidth = width * 5 / 10
+		appHeight = height * 5 / 10
+	}
+	log.SugaredLogger.Info("screen resolution: " + convertor.ToString(width) + "x" + convertor.ToString(height))
+	log.SugaredLogger.Info("window size: " + convertor.ToString(appWidth) + "x" + convertor.ToString(appHeight))
+
+	// 作为 go-stock 子组件启动独立 Web 服务
+	// 端口默认由 AI_ASSISTANT_WEB_ADDR 决定。
+	go func() {
+		if err := assistantweb.Start(); err != nil {
+			log.SugaredLogger.Errorf("ai-assistant-web start error: %v", err)
+		}
+	}()
+
 	// Create application with options
 	err = wails.Run(&options.App{
-		Title:     "go-stock",
-		Width:     width * 4 / 5,
-		Height:    900,
-		MinWidth:  1456,
-		MinHeight: 768,
+		Title: "go-stock：AI赋能股票分析✨ " + OFFICIAL_STATEMENT + " " + convertor.ToString(appWidth) + "x" + convertor.ToString(appHeight),
+		// 默认窗口大小：自适应但保留明显边距
+		Width:  appWidth,
+		Height: appHeight,
+		//MinWidth:  minWidth,
+		//MinHeight: minHeight,
+		// 限制最大尺寸不超过屏幕
 		//MaxWidth:                 width,
 		//MaxHeight:                height,
 		DisableResize:            false,
 		Fullscreen:               false,
-		Frameless:                true,
+		Frameless:                false,
 		StartHidden:              false,
 		HideWindowOnClose:        false,
 		EnableDefaultContextMenu: true,
 		BackgroundColour:         backgroundColour,
 		Assets:                   assets,
 		Menu:                     AppMenu,
-		Logger:                   nil,
+		Logger:                   logger.NewFileLogger("./logs/wails.log"),
 		LogLevel:                 logger.DEBUG,
-		LogLevelProduction:       logger.ERROR,
+		LogLevelProduction:       logger.INFO,
 		OnStartup:                app.startup,
 		OnDomReady:               app.domReady,
 		OnBeforeClose:            app.beforeClose,
@@ -162,19 +209,18 @@ func main() {
 		// Mac platform specific options
 		Mac: &mac.Options{
 			TitleBar: &mac.TitleBar{
-				TitlebarAppearsTransparent: true,
+				TitlebarAppearsTransparent: false,
 				HideTitle:                  false,
 				HideTitleBar:               false,
 				FullSizeContent:            false,
-				UseToolbar:                 false,
-				HideToolbarSeparator:       true,
+				UseToolbar:                 true,
 			},
 			Appearance:           mac.NSAppearanceNameDarkAqua,
 			WebviewIsTransparent: true,
 			WindowIsTranslucent:  true,
 			About: &mac.AboutInfo{
 				Title:   "go-stock",
-				Message: "",
+				Message: "go-stock：AI赋能股票分析✨ ",
 				Icon:    icon,
 			},
 		},
@@ -184,6 +230,36 @@ func main() {
 		log.SugaredLogger.Fatal(err)
 	}
 
+}
+
+func cacheCookies(url string) {
+	log.SugaredLogger.Info("预缓存东财 Cookie...")
+	_, err := data.FetchEastMoneyCookiesViaChromedp("", 3*time.Minute, url)
+	if err != nil {
+		log.SugaredLogger.Warnf("预缓存东财 Cookie 失败：%v", err)
+	} else {
+		log.SugaredLogger.Info("东财 Cookie 预缓存完成")
+	}
+}
+
+func updateMultipleModel() {
+	oldSettings := &models.OldSettings{}
+	db.Dao.Model(oldSettings).First(oldSettings)
+	aiConfig := &data.AIConfig{}
+	db.Dao.Model(aiConfig).First(aiConfig)
+	if oldSettings.OpenAiEnable && oldSettings.OpenAiApiKey != "" && aiConfig.ID == 0 {
+		aiConfig.Name = oldSettings.OpenAiModelName
+		aiConfig.ApiKey = oldSettings.OpenAiApiKey
+		aiConfig.BaseUrl = oldSettings.OpenAiBaseUrl
+		aiConfig.ModelName = oldSettings.OpenAiModelName
+		aiConfig.Temperature = oldSettings.OpenAiTemperature
+		aiConfig.MaxTokens = oldSettings.OpenAiMaxTokens
+		aiConfig.TimeOut = oldSettings.OpenAiApiTimeOut
+		err := db.Dao.Model(aiConfig).Create(aiConfig).Error
+		if err != nil {
+			log.SugaredLogger.Error(err.Error())
+		}
+	}
 }
 
 func AutoMigrate() {
@@ -196,6 +272,7 @@ func AutoMigrate() {
 	db.Dao.AutoMigrate(&models.StockInfoHK{})
 	db.Dao.AutoMigrate(&models.StockInfoUS{})
 	db.Dao.AutoMigrate(&data.FollowedFund{})
+	db.Dao.AutoMigrate(&data.FollowedStock{})
 	db.Dao.AutoMigrate(&data.FundBasic{})
 	db.Dao.AutoMigrate(&models.PromptTemplate{})
 	db.Dao.AutoMigrate(&data.Group{})
@@ -204,6 +281,46 @@ func AutoMigrate() {
 	db.Dao.AutoMigrate(&models.Telegraph{})
 	db.Dao.AutoMigrate(&models.TelegraphTags{})
 	db.Dao.AutoMigrate(&models.LongTigerRankData{})
+	db.Dao.AutoMigrate(&data.AIConfig{})
+	db.Dao.AutoMigrate(&models.BKDict{})
+	db.Dao.AutoMigrate(&models.WordAnalyze{})
+	db.Dao.AutoMigrate(&models.SentimentResultAnalyze{})
+	db.Dao.AutoMigrate(&models.AiRecommendStocks{})
+	db.Dao.AutoMigrate(&models.AllStockInfo{})
+	db.Dao.AutoMigrate(&models.CronTask{})
+	db.Dao.AutoMigrate(&models.AiAssistantSession{})
+	db.Dao.AutoMigrate(&models.GlobalStockIndex{})
+	db.Dao.AutoMigrate(&data.TradingRecord{})
+
+	//updateMultipleModel()
+
+	// 初始化 global_stock_index_cache 定时任务
+	initGlobalStockIndexCacheTask()
+}
+
+// initGlobalStockIndexCacheTask 检查并创建 global_stock_index_cache 定时任务
+func initGlobalStockIndexCacheTask() {
+	var count int64
+	db.Dao.Model(&models.CronTask{}).Where("task_type = ?", "global_stock_index_cache").Count(&count)
+	if count == 0 {
+		task := &models.CronTask{
+			Name:        "全球指数缓存",
+			CronExpr:    "0 0/5 * * * *", // 每分钟执行一次
+			TaskType:    "global_stock_index_cache",
+			Target:      "",
+			Params:      `{"crawlTimeOut": 30}`,
+			Enable:      true,
+			Status:      "active",
+			Description: "自动缓存全球股票指数数据",
+		}
+		err := db.Dao.Create(task).Error
+		if err != nil {
+			log.SugaredLogger.Errorf("创建 global_stock_index_cache 定时任务失败：%v", err)
+		} else {
+			log.SugaredLogger.Info("创建 global_stock_index_cache 定时任务成功")
+		}
+	}
+
 }
 
 func initStockDataUS(ctx context.Context) {
@@ -260,7 +377,7 @@ func initStockDataHK(ctx context.Context) {
 }
 
 func updateBasicInfo() {
-	config := data.NewSettingsApi(&data.Settings{}).GetConfig()
+	config := data.GetSettingConfig()
 	if config.UpdateBasicInfoOnStart {
 		//更新基本信息
 		go data.NewStockDataApi().GetStockBaseInfo()
@@ -344,6 +461,9 @@ func checkDir(dir string) {
 	if os.IsNotExist(err) {
 		os.Mkdir(dir, os.ModePerm)
 		log.SugaredLogger.Info("create dir: " + dir)
+	}
+	if BuildKey == "" {
+		BuildKey = "cc1e0d684e32f176c56ff1fcf384dcd9"
 	}
 }
 

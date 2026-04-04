@@ -20,13 +20,16 @@ type BrowserPool struct {
 func NewBrowserPool(size int) *BrowserPool {
 	pool := make(chan *context.Context, size)
 	for i := 0; i < size; i++ {
-		path := GetConfig().BrowserPath
-		crawlTimeOut := GetConfig().CrawlTimeOut
+		path := GetSettingConfig().BrowserPath
+		crawlTimeOut := GetSettingConfig().CrawlTimeOut
 		if crawlTimeOut < 15 {
 			crawlTimeOut = 30
 		}
 		if path != "" {
-			ctx, _ := context.WithTimeout(context.Background(), time.Duration(crawlTimeOut)*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(crawlTimeOut)*time.Second)
+			// Note: cancel is intentionally not called here as chromedp handles
+			// context cleanup via chromedp.Cancel() in Put/Close methods
+			_ = cancel
 			ctx, _ = chromedp.NewExecAllocator(
 				ctx,
 				chromedp.ExecPath(path),

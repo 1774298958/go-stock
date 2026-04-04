@@ -3,15 +3,22 @@
 // preview.css相比style.css少了编辑器那部分样式
 import 'md-editor-v3/lib/preview.css';
 import {h, onBeforeUnmount, onMounted, ref} from 'vue';
-import {CheckUpdate, GetVersionInfo} from "../../wailsjs/go/main/App";
-import {EventsOff, EventsOn} from "../../wailsjs/runtime";
-import {NAvatar, NButton, useNotification} from "naive-ui";
+import {CheckUpdate, GetVersionInfo,GetSponsorInfo,OpenURL} from "../../wailsjs/go/main/App";
+import {EventsOff, EventsOn,Environment} from "../../wailsjs/runtime";
+import {NAvatar, NButton, useNotification,NText} from "naive-ui";
+import { addMonths, format ,parse} from 'date-fns';
+import { zhCN } from 'date-fns/locale';
 const updateLog = ref('');
 const versionInfo = ref('');
 const icon = ref('https://raw.githubusercontent.com/ArvinLovegood/go-stock/master/build/appicon.png');
 const alipay =ref('https://github.com/ArvinLovegood/go-stock/raw/master/build/screenshot/alipay.jpg')
 const wxpay =ref('https://github.com/ArvinLovegood/go-stock/raw/master/build/screenshot/wxpay.jpg')
+const wxgzh =ref('https://github.com/ArvinLovegood/go-stock/raw/dev/build/screenshot/%E6%89%AB%E7%A0%81_%E6%90%9C%E7%B4%A2%E8%81%94%E5%90%88%E4%BC%A0%E6%92%AD%E6%A0%B7%E5%BC%8F-%E7%99%BD%E8%89%B2%E7%89%88.png')
 const notify = useNotification()
+const vipLevel=ref("");
+const vipStartTime=ref("");
+const vipEndTime=ref("");
+const expired=ref(false)
 
 onMounted(() => {
   document.title = '关于软件';
@@ -21,7 +28,25 @@ onMounted(() => {
     icon.value = res.icon;
     alipay.value=res.alipay;
     wxpay.value=res.wxpay;
+    wxgzh.value=res.wxgzh;
+
+    GetSponsorInfo().then((res) => {
+      vipLevel.value = res.vipLevel;
+      vipStartTime.value = res.vipStartTime;
+      vipEndTime.value = res.vipEndTime;
+      //判断时间是否到期
+      if (res.vipLevel) {
+        if (res.vipEndTime < format(new Date(), 'yyyy-MM-dd HH:mm:ss')) {
+          notify.warning({content: 'VIP已到期'})
+          expired.value = true;
+        }
+      }
+    })
+
   });
+
+
+
 })
 onBeforeUnmount(() => {
   notify.destroyAll()
@@ -70,7 +95,16 @@ EventsOn("updateVersion",async (msg) => {
         type: 'primary',
         size: 'small',
         onClick: () => {
-          window.open(msg.html_url)
+          Environment().then(env => {
+            switch (env.platform) {
+              case 'windows':
+                window.open(msg.html_url)
+                break
+              default :
+                OpenURL(msg.html_url)
+                break
+            }
+          })
         }
       }, { default: () => '查看' })
     }
@@ -80,21 +114,22 @@ EventsOn("updateVersion",async (msg) => {
 </script>
 
 <template>
-      <n-space vertical size="large">
+      <n-space vertical size="large"  style="--wails-draggable:no-drag">
         <!-- 软件描述 -->
         <n-card size="large">
           <n-divider title-placement="center">关于软件</n-divider>
           <n-space vertical >
             <n-image width="100" :src="icon" />
             <h1>
-              <n-badge :value="versionInfo" :offset="[50,10]"  type="success">
+              <n-badge v-if="!vipLevel"  :value="versionInfo" :offset="[80,10]"  type="success">
                 <n-gradient-text type="info" :size="50" >go-stock</n-gradient-text>
               </n-badge>
+              <n-badge v-if="vipLevel"  :value="versionInfo" :offset="[70,10]"  type="success">
+                <n-gradient-text :type="expired?'error':'warning'" :size="50" >go-stock</n-gradient-text><n-tag :bordered="false" size="small" type="warning">VIP{{vipLevel}}</n-tag>
+              </n-badge>
             </h1>
-            <n-button size="tiny" @click="CheckUpdate"  type="info" tertiary >检查更新</n-button>
-
-
-
+            <n-gradient-text  :type="expired?'error':'warning'" v-if="vipLevel" >vip到期时间：{{vipEndTime}}</n-gradient-text>
+            <n-button size="tiny" @click="CheckUpdate(1)"  type="info" tertiary >检查更新</n-button>
             <div style="justify-self: center;text-align: left" >
               <p>自选股行情实时监控，基于Wails和NaiveUI构建的AI赋能股票分析工具</p>
               <p>目前已支持A股，港股，美股，未来计划加入基金，ETF等支持</p>
@@ -113,14 +148,39 @@ EventsOn("updateVersion",async (msg) => {
               <p>QQ交流群：<a href="http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=0YQ8qD3exahsD4YLNhzQTWe5ssstWC89&authKey=usOMMRFtIQDC%2FYcatHYapcxQbJ7PwXPHK9OypTXWzNjAq%2FRVvQu9bj2lRgb%2BSZ3p&noverify=0&group_code=491605333" target="_blank">491605333</a></p>
             </div>
           </n-space>
+          <n-divider title-placement="center">支持💕开源</n-divider>
+          <n-flex justify="center">
+            <n-table  size="small" style="width: 820px">
+              <n-thead>
+                <n-tr>
+                  <n-th>赞助计划</n-th>
+                  <n-th>赞助等级</n-th>
+                  <n-th>权益说明</n-th>
+                </n-tr>
+              </n-thead>
+              <n-tbody>
+                <n-tr>
+                  <n-td>每月 0 RMB</n-td><n-td>vip0</n-td><n-td>🌟 全部功能,软件自动更新(从GitHub下载),自行解决github平台网络问题。</n-td>
+                </n-tr>
+                <n-tr>
+                  <n-td>赞助 18.8 RMB/月<br>赞助 120 RMB/年</n-td><n-td>vip1</n-td><n-td>💕 全部功能,软件自动更新(从CDN下载),更新快速便捷。AI配置指导，提示词参考等</n-td>
+                </n-tr>
+                <n-tr>
+                  <n-td>赞助 28.8 RMB/月<br>赞助 240 RMB/年</n-td><n-td>vip2</n-td><n-td>💕 vip1全部功能,启动时自动同步最近24小时市场资讯(包括外媒简讯)，go-stock Ai助手等(详询作者微信/QQ)💕</n-td>
+                </n-tr>
+                <n-tr>
+                  <n-td>每月赞助 X RMB</n-td><n-td>vipX</n-td><n-td>🧩 更多计划，视go-stock开源项目发展情况而定...(承接GitHub项目README广告推广💖)</n-td>
+                </n-tr>
+              </n-tbody>
+            </n-table>
+          </n-flex>
           <n-divider title-placement="center">关于作者</n-divider>
           <n-space vertical>
 <!--            <h1>关于作者</h1>-->
             <n-avatar width="100" src="https://avatars.githubusercontent.com/u/7401917?v=4" />
             <h2><a href="https://github.com/ArvinLovegood" target="_blank">@ArvinLovegood</a></h2>
-            <p>一个热爱编程的小白，欢迎关注我的Github</p>
-            <n-image width="300" src="https://go-stock.sparkmemory.top/assets/%E6%89%AB%E7%A0%81_%E6%90%9C%E7%B4%A2%E8%81%94%E5%90%88%E4%BC%A0%E6%92%AD%E6%A0%B7%E5%BC%8F-%E7%99%BD%E8%89%B2%E7%89%88-DEJtWc_y.png" />
-
+            <p>一个热爱编程的小白，欢迎关注我的Github/微信公众号</p>
+            <n-image width="300" :src="wxgzh" />
             <p>开源不易，如果觉得好用，可以请作者喝杯咖啡。</p>
             <n-flex justify="center">
               <n-image width="200" :src="alipay" />
@@ -135,6 +195,7 @@ EventsOn("updateVersion",async (msg) => {
             </p>
             <p>
               感谢以下开发者：
+              <a href="https://github.com/GiCo001" target="_blank">@Gico</a><n-divider vertical />
               <a href="https://github.com/CodeNoobLH" target="_blank">浓睡不消残酒</a><n-divider vertical />
               <a href="https://github.com/gnim2600" target="_blank">@gnim2600</a><n-divider vertical />
               <a href="https://github.com/XXXiaohuayanGGG" target="_blank">@XXXiaohuayanGGG</a><n-divider vertical />
@@ -150,7 +211,7 @@ EventsOn("updateVersion",async (msg) => {
           </div>
           <n-divider title-placement="center">关于版权和技术支持申明</n-divider>
           <div style="justify-self: center;text-align: left" >
-            <p style="color: #FAA04A">如有问题，请先查看项目文档，如果问题依然存在，请优先加群（491605333）咨询。</p>
+            <p style="color: #FAA04A">如有问题，请先查看项目文档和微信公众号教程，如果问题依然存在，请优先加群（491605333）咨询。</p>
             <p>
               如需软件商业授权或定制开发，请联系作者微信(备注 商业咨询)：ArvinLovegood
             </p>

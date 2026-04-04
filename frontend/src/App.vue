@@ -6,17 +6,18 @@ import {
   Quit,
   WindowFullscreen,
   WindowHide,
-  WindowUnfullscreen
+  WindowUnfullscreen,
+  WindowSetTitle
 } from '../wailsjs/runtime'
 import {h, onBeforeMount, onBeforeUnmount, onMounted, ref} from "vue";
 import {RouterLink, useRouter} from 'vue-router'
-import {createDiscreteApi,darkTheme,lightTheme , NIcon, NText,dateZhCN,zhCN} from 'naive-ui'
+import {createDiscreteApi,darkTheme,lightTheme , NIcon, NText,NButton,dateZhCN,zhCN} from 'naive-ui'
 import {
   AlarmOutline,
   AnalyticsOutline,
-  BarChartSharp, Bonfire, BonfireOutline, EaselSharp,
+  BarChartSharp, Bonfire, BonfireOutline, DiamondOutline, EaselSharp,
   ExpandOutline, Flag,
-  Flame, FlameSharp, InformationOutline,
+  Flame, FlameSharp, FlaskOutline, InformationOutline,
   LogoGithub,
   NewspaperOutline,
   NewspaperSharp, Notifications,
@@ -25,14 +26,16 @@ import {
   SettingsOutline, Skull, SkullOutline, SkullSharp,
   SparklesOutline,
   StarOutline,
-  Wallet, WarningOutline,
+  Wallet, WarningOutline, TimeOutline,
 } from '@vicons/ionicons5'
-import {AnalyzeSentiment, GetConfig, GetGroupList} from "../wailsjs/go/main/App";
-import {Dragon, Fire, Gripfire} from "@vicons/fa";
-import {ReportSearch} from "@vicons/tabler";
+import {AnalyzeSentiment, GetConfig, GetGroupList,GetVersionInfo} from "../wailsjs/go/main/App";
+import FloatingAiAssistant from "./components/FloatingAiAssistant.vue";
+import FloatingAgentAssistant from "./components/FloatingAgentAssistant.vue";
+import {Dragon, Fire, FirefoxBrowser, Gripfire, Robot} from "@vicons/fa";
+import {Prompt, ReportAnalytics, ReportMoney, ReportSearch, TrendingUp} from "@vicons/tabler";
 import {LocalFireDepartmentRound} from "@vicons/material";
-import {BoxSearch20Regular, CommentNote20Filled} from "@vicons/fluent";
-import {FireFilled, FireOutlined, NotificationFilled, StockOutlined} from "@vicons/antd";
+import {AppsList20Regular, BoxSearch20Regular, CommentNote20Filled} from "@vicons/fluent";
+import {FireFilled, MoneyCollectOutlined, NotificationFilled, StockOutlined} from "@vicons/antd";
 
 
 
@@ -43,14 +46,16 @@ const loadingMsg = ref("加载数据中...")
 const enableNews = ref(false)
 const contentStyle = ref("")
 const enableFund = ref(false)
+const enableAgent = ref(false)
 const enableDarkTheme = ref(null)
-const content = ref('数据来源于网络,仅供参考;投资有风险,入市需谨慎\n\n未经授权,禁止商业目的!')
+const content = ref('未经授权,禁止商业目的!\n\n数据来源于网络,仅供参考;投资有风险,入市需谨慎')
 const isFullscreen = ref(false)
-const activeKey = ref('')
+const activeKey = ref('stock')
 const containerRef = ref({})
 const realtimeProfit = ref(0)
 const telegraph = ref([])
 const groupList = ref([])
+const officialStatement= ref("")
 const menuOptions = ref([
   {
     label: () =>
@@ -64,7 +69,10 @@ const menuOptions = ref([
                   groupId: 0,
                 },
                 params: {},
-              }
+              },
+              onClick: () => {
+                activeKey.value = 'stock'
+              },
             },
             {default: () => '股票自选',}
         ),
@@ -79,6 +87,7 @@ const menuOptions = ref([
                   href: '#',
                   type: 'info',
                   onClick: () => {
+                    activeKey.value = 'stock'
                     //console.log("push",item)
                     router.push({
                       name: 'stock',
@@ -114,6 +123,7 @@ const menuOptions = ref([
                 params: {}
               },
               onClick: () => {
+                activeKey.value = 'market'
                 EventsEmit("changeMarketTab", {ID: 0, name: '市场快讯'})
               },
             },
@@ -135,6 +145,7 @@ const menuOptions = ref([
                     }
                   },
                   onClick: () => {
+                    activeKey.value = 'market'
                     EventsEmit("changeMarketTab", {ID: 0, name: '市场快讯'})
                   },
                 },
@@ -156,6 +167,7 @@ const menuOptions = ref([
                     },
                   },
                   onClick: () => {
+                    activeKey.value = 'market'
                     EventsEmit("changeMarketTab", {ID: 0, name: '全球股指'})
                   },
                 },
@@ -173,14 +185,15 @@ const menuOptions = ref([
                   to: {
                     name: 'market',
                     query: {
-                      name: "指标行情",
+                      name: "重大指数",
                     }
                   },
                   onClick: () => {
-                    EventsEmit("changeMarketTab", {ID: 0, name: '指标行情'})
+                    activeKey.value = 'market'
+                    EventsEmit("changeMarketTab", {ID: 0, name: '重大指数'})
                   },
                 },
-                {default: () => '指标行情',}
+                {default: () => '重大指数',}
             ),
         key: 'market3',
         icon: renderIcon(AnalyticsOutline),
@@ -198,6 +211,7 @@ const menuOptions = ref([
                     }
                   },
                   onClick: () => {
+                    activeKey.value = 'market'
                     EventsEmit("changeMarketTab", {ID: 0, name: '行业排名'})
                   },
                 },
@@ -219,6 +233,7 @@ const menuOptions = ref([
                     }
                   },
                   onClick: () => {
+                    activeKey.value = 'market'
                     EventsEmit("changeMarketTab", {ID: 0, name: '个股资金流向'})
                   },
                 },
@@ -240,6 +255,7 @@ const menuOptions = ref([
                     }
                   },
                   onClick: () => {
+                    activeKey.value = 'market'
                     EventsEmit("changeMarketTab", {ID: 0, name: '龙虎榜'})
                   },
                 },
@@ -261,6 +277,7 @@ const menuOptions = ref([
                     }
                   },
                   onClick: () => {
+                    activeKey.value = 'market'
                     EventsEmit("changeMarketTab", {ID: 0, name: '个股研报'})
                   },
                 },
@@ -282,6 +299,7 @@ const menuOptions = ref([
                     }
                   },
                   onClick: () => {
+                    activeKey.value = 'market'
                     EventsEmit("changeMarketTab", {ID: 0, name: '公司公告'})
                   },
                 },
@@ -303,6 +321,7 @@ const menuOptions = ref([
                     }
                   },
                   onClick: () => {
+                    activeKey.value = 'market'
                     EventsEmit("changeMarketTab", {ID: 0, name: '行业研究'})
                   },
                 },
@@ -324,6 +343,7 @@ const menuOptions = ref([
                     }
                   },
                   onClick: () => {
+                    activeKey.value = 'market'
                     EventsEmit("changeMarketTab", {ID: 0, name: '当前热门'})
                   },
                 },
@@ -345,6 +365,7 @@ const menuOptions = ref([
                     }
                   },
                   onClick: () => {
+                    activeKey.value = 'market'
                     EventsEmit("changeMarketTab", {ID: 0, name: '指标选股'})
                   },
                 },
@@ -352,6 +373,28 @@ const menuOptions = ref([
             ),
         key: 'market11',
         icon: renderIcon(BoxSearch20Regular),
+      },
+      {
+        label: () =>
+            h(
+                RouterLink,
+                {
+                  href: '#',
+                  to: {
+                    name: 'market',
+                    query: {
+                      name: "名站优选",
+                    }
+                  },
+                  onClick: () => {
+                    activeKey.value = 'market'
+                    EventsEmit("changeMarketTab", {ID: 0, name: '名站优选'})
+                  },
+                },
+                {default: () => '名站优选',}
+            ),
+        key: 'market12',
+        icon: renderIcon(FirefoxBrowser),
       },
     ]
   },
@@ -362,8 +405,13 @@ const menuOptions = ref([
             {
               to: {
                 name: 'fund',
-                params: {},
-              }
+                query: {
+                  name: '基金自选',
+                },
+              },
+              onClick: () => {
+                activeKey.value = 'fund'
+              },
             },
             {default: () => '基金自选',}
         ),
@@ -385,8 +433,220 @@ const menuOptions = ref([
             RouterLink,
             {
               to: {
+                name: 'agent',
+                query: {
+                  name:"Ai智能体",
+                },
+                onClick: () => {
+                  activeKey.value = 'agent'
+                },
+              }
+            },
+            {default: () => 'Ai智能体'}
+        ),
+    key: 'agent',
+    show:enableAgent.value,
+    icon: renderIcon(Robot),
+  },
+    {
+      label: () =>
+          h(
+              RouterLink,
+              {
+                to: {
+                  name: 'research',
+                  query: {
+                    name:"研究中心",
+                  },
+                },
+                onClick: () => {
+                  activeKey.value = 'research'
+                  setTimeout(() => {
+                    EventsEmit("changeResearchTab", {ID: 0, name: 'AI分析报告'})
+                  }, 100)
+                },
+              },
+              {default: () => '研究中心'}
+          ),
+      key: 'research',
+      icon: renderIcon(FlaskOutline),
+      children:[
+          {
+            label: () =>
+                h(
+                    RouterLink,
+                    {
+                      to: {
+                        name: 'research',
+                        query: {
+                          name:"AI分析报告",
+                        },
+                      },
+                      onClick: () => {
+                        activeKey.value = 'research'
+                        setTimeout(() => {
+                          EventsEmit("changeResearchTab", {ID: 0, name: 'AI分析报告'})
+                        }, 100)
+                      },
+                    },
+                    {default: () => 'AI分析报告'}
+                ),
+            key: 'research1',
+            icon: renderIcon(ReportAnalytics),
+          },
+        {
+          label: () =>
+              h(
+                  RouterLink,
+                  {
+                    to: {
+                      name: 'research',
+                      query: {
+                        name:"股票推荐记录",
+                      },
+                    },
+                    onClick: () => {
+                      activeKey.value = 'research'
+                      setTimeout(() => {
+                        EventsEmit("changeResearchTab", {ID: 1, name: '股票推荐记录'})
+                      }, 100)
+                    },
+                  },
+                  {default: () => '股票推荐记录'}
+              ),
+          key: 'research2',
+          icon: renderIcon(DiamondOutline),
+        },
+        {
+          label: () =>
+              h(
+                  RouterLink,
+                  {
+                    to: {
+                      name: 'research',
+                      query: {
+                        name:"异动监控",
+                      },
+                    },
+                    onClick: () => {
+                      activeKey.value = 'research'
+                      setTimeout(() => {
+                        EventsEmit("changeResearchTab", {ID: 2, name: '异动监控'})
+                      }, 100)
+                    },
+                  },
+                  {default: () => '异动监控'}
+              ),
+          key: 'stockChanges',
+          icon: renderIcon(TrendingUp),
+        },
+        {
+          label: () =>
+              h(
+                  RouterLink,
+                  {
+                    to: {
+                      name: 'research',
+                      query: {
+                        name:"提示词模板",
+                      },
+                    },
+                    onClick: () => {
+                      activeKey.value = 'research'
+                      setTimeout(() => {
+                        EventsEmit("changeResearchTab", {ID: 3, name: '提示词模板'})
+                      }, 100)
+                    },
+                  },
+                  {default: () => '提示词模板'}
+              ),
+          key: 'research3',
+          icon: renderIcon(Prompt),
+        },
+        {
+          label: () =>
+              h(
+                  RouterLink,
+                  {
+                    to: {
+                      name: 'research',
+                      query: {
+                        name:"股票信息筛选",
+                      },
+                    },
+                    onClick: () => {
+                      activeKey.value = 'research'
+                      setTimeout(() => {
+                        EventsEmit("changeResearchTab", {ID: 3, name: '股票信息筛选'})
+                      }, 100)
+                    },
+                  },
+                  {default: () => '股票信息筛选'}
+              ),
+          key: 'research4',
+          icon: renderIcon(AppsList20Regular),
+        },
+        {
+          label: () =>
+              h(
+                  RouterLink,
+                  {
+                    to: {
+                      name: 'cronTasks',
+                      query: {
+                        name:"定时任务",
+                      },
+                    },
+                    onClick: () => {
+                      activeKey.value = 'research'
+                      setTimeout(() => {
+                        EventsEmit("changeResearchTab", {ID: 5, name: '定时任务'})
+                      }, 100)
+                    },
+                  },
+                  {default: () => '定时任务'}
+              ),
+          key: 'research5',
+          icon: renderIcon(TimeOutline),
+        },
+        {
+          label: () =>
+              h(
+                  RouterLink,
+                  {
+                    to: {
+                      name: 'research',
+                      query: {
+                        name:"交易日志",
+                      },
+                    },
+                    onClick: () => {
+                      activeKey.value = 'research'
+                      setTimeout(() => {
+                        EventsEmit("changeResearchTab", {ID: 6, name: '交易日志'})
+                      }, 100)
+                    },
+                  },
+                  {default: () => '交易日志(beta)'}
+              ),
+          key: 'research6',
+          icon: renderIcon(MoneyCollectOutlined),
+        },
+      ],
+    },
+  {
+    label: () =>
+        h(
+            RouterLink,
+            {
+              to: {
                 name: 'settings',
-                params: {}
+                query: {
+                  name:"设置",
+                },
+                onClick: () => {
+                  activeKey.value = 'settings'
+                },
               }
             },
             {default: () => '设置'}
@@ -401,8 +661,13 @@ const menuOptions = ref([
             {
               to: {
                 name: 'about',
-                params: {}
-              }
+                query: {
+                  name:"关于",
+                }
+              },
+              onClick: () => {
+                activeKey.value = 'about'
+              },
             },
             {default: () => '关于'}
         ),
@@ -410,6 +675,7 @@ const menuOptions = ref([
     icon: renderIcon(LogoGithub),
   },
   {
+    show:false,
     label: () => h("a", {
       href: '#',
       onClick: toggleFullscreen,
@@ -422,7 +688,7 @@ const menuOptions = ref([
     label: () => h("a", {
       href: '#',
       onClick: WindowHide,
-      title: '隐藏到托盘区 Ctrl+H',
+      title: '隐藏到托盘区 Ctrl+Z',
     }, {default: () => '隐藏到托盘区'}),
     key: 'hide',
     icon: renderIcon(ReorderTwoOutline),
@@ -451,6 +717,7 @@ function renderIcon(icon) {
 }
 
 function toggleFullscreen(e) {
+  activeKey.value = 'full'
   //console.log(e)
   if (isFullscreen.value) {
     WindowUnfullscreen()
@@ -518,6 +785,13 @@ window.onerror = function (msg, source, lineno, colno, error) {
 };
 
 onBeforeMount(() => {
+  GetVersionInfo().then(result => {
+    if(result.officialStatement){
+      content.value = result.officialStatement+"\n\n"+content.value
+      officialStatement.value = result.officialStatement
+    }
+  })
+
   GetGroupList().then(result => {
     groupList.value = result
     menuOptions.value.map((item) => {
@@ -565,10 +839,14 @@ onBeforeMount(() => {
   GetConfig().then((res) => {
     //console.log(res)
     enableFund.value = res.enableFund
+    enableAgent.value = res.enableAgent
 
     menuOptions.value.filter((item) => {
       if (item.key === 'fund') {
         item.show = res.enableFund
+      }
+      if (item.key === 'agent') {
+        item.show = res.enableAgent
       }
     })
 
@@ -581,12 +859,14 @@ onBeforeMount(() => {
 })
 
 onMounted(() => {
+  WindowSetTitle("go-stock：AI赋能股票分析✨ "+officialStatement.value+"  未经授权,禁止商业目的！ [数据来源于网络,仅供参考;投资有风险,入市需谨慎]")
   contentStyle.value = "max-height: calc(92vh);overflow: hidden"
   GetConfig().then((res) => {
     if (res.enableNews) {
       enableNews.value = true
     }
     enableFund.value = res.enableFund
+    enableAgent.value = res.enableAgent
     const {notification } =createDiscreteApi(["notification"], {
       configProviderProps: {
         theme: enableDarkTheme.value ? darkTheme : lightTheme ,
@@ -600,16 +880,24 @@ onMounted(() => {
           //type:"error",
          // avatar: () => h(NIcon,{component:Notifications,color:"red"}),
           title: data.time,
-          content: () => h(NText,{type:"error"}, { default: () => data.content }),
+          content: () => h('div',{type:"error",style:{
+              "text-align":"left",
+              "font-size":"14px",
+              "color":"#f67979"
+            }}, { default: () => data.content }),
           meta: () => h(NText,{type:"warning"}, { default: () => data.source}),
           duration:1000*40,
         })
       }else{
-        notification.create({
+         notification.create({
           //type:"info",
           //avatar: () => h(NIcon,{component:Notifications}),
           title: data.time,
-          content: () => h(NText,{type:"info"}, { default: () => data.content }),
+          content: () => h('div',{type:"info",style:{
+            "text-align":"left",
+              "font-size":"14px",
+              "color": data.source==="go-stock"?"#F98C24":"#549EC8"
+            }}, { default: () => data.content }),
           meta: () => h(NText,{type:"warning"}, { default: () => data.source}),
           duration:1000*30 ,
         })
@@ -625,7 +913,7 @@ onMounted(() => {
         <n-modal-provider>
           <n-dialog-provider>
             <n-watermark
-                :content="content"
+                :content="''"
                 cross
                 selectable
                 :font-size="16"
@@ -636,6 +924,8 @@ onMounted(() => {
                 :y-offset="150"
                 :rotate="-15"
             >
+<!--              <FloatingAiAssistant />-->
+              <FloatingAgentAssistant />
               <n-flex>
                 <n-grid x-gap="12" :cols="1">
                   <n-gi>
@@ -656,7 +946,7 @@ onMounted(() => {
                     </n-spin>
                   </n-gi>
                   <n-gi style="position: fixed;bottom:0;z-index: 9;width: 100%;">
-                    <n-card size="small" style="--wails-draggable:drag">
+                    <n-card size="small" style="--wails-draggable:no-drag">
                       <n-menu style="font-size: 18px;"
                               v-model:value="activeKey"
                               mode="horizontal"

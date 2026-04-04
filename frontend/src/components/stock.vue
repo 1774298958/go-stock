@@ -1,12 +1,14 @@
 <script setup>
-import {computed, h, onBeforeMount, onBeforeUnmount, onMounted, reactive, ref} from 'vue'
+import {computed, h, nextTick, onBeforeMount, onBeforeUnmount, onMounted, reactive, ref, watch} from 'vue'
 import * as echarts from 'echarts';
 import {
   AddGroup,
   AddStockGroup,
   Follow,
+  GetAiConfigs,
   GetAIResponseResult,
   GetConfig,
+  GetEffectiveSponsorVip,
   GetFollowList,
   GetGroupList,
   GetPromptTemplates,
@@ -15,18 +17,24 @@ import {
   GetStockMinutePriceLineData,
   GetVersionInfo,
   Greet,
+  InitializeGroupSort,
   NewChatStream,
+  OpenURL,
   RemoveGroup,
   RemoveStockGroup,
   SaveAIResponseResult,
   SaveAsMarkdown,
+  SaveImage,
+  SaveWordFile,
   SendDingDingMessageByType,
   SetAlarmChangePercent,
   SetCostPriceAndVolume,
   SetStockAICron,
   SetStockSort,
+  SetTradingPrice,
   ShareAnalysis,
-  UnFollow
+  UnFollow,
+  UpdateGroupSort
 } from '../../wailsjs/go/main/App'
 import {
   NAvatar,
@@ -41,6 +49,7 @@ import {
   useNotification
 } from 'naive-ui'
 import {
+  Environment,
   EventsEmit,
   EventsOff,
   EventsOn,
@@ -63,6 +72,8 @@ import vueDanmaku from 'vue3-danmaku'
 import {keys, padStart} from "lodash";
 import {useRoute, useRouter} from 'vue-router'
 import MoneyTrend from "./moneyTrend.vue";
+import StockSparkLine from "./stockSparkLine.vue";
+import StockLightweightKlineChart from "./StockLightweightKlineChart.vue";
 
 const route = useRoute()
 const router = useRouter()
@@ -100,7 +111,22 @@ const modalShow2 = ref(false)
 const modalShow3 = ref(false)
 const modalShow4 = ref(false)
 const modalShow5 = ref(false)
+const modalShow6 = ref(false)
+const lwKlineCode = ref('')
+const lwKlineName = ref('')
+const currentStockTradingPrice = ref({
+  stockCode: '',
+  costPrice: 0,
+  entryPrice: 0,
+  takeProfitPrice: 0,
+  stopLossPrice: 0,
+})
+/** 用于功能权限：仅在赞助有效期内为解密等级，否则为 0（与 EffectiveSponsorVipLevel 一致） */
+const vipLevel = ref(0)
+const klineAutoCloseTimer = ref(null)
 const addBTN = ref(true)
+const enableTools = ref(true)
+const thinkingMode = ref(false)
 const formModel = ref({
   name: "",
   code: "",
@@ -110,9 +136,13 @@ const formModel = ref({
   alarmPrice: 0,
   sort: 999,
   cron: "",
+  entryPrice: 0,
+  takeProfitPrice: 0,
+  stopLossPrice: 0,
 })
 
 const promptTemplates = ref([])
+const aiConfigs = ref([])
 const sysPromptOptions = ref([])
 const userPromptOptions = ref([])
 const data = reactive({
@@ -120,6 +150,7 @@ const data = reactive({
   chatId: "",
   question: "",
   sysPromptId: null,
+  aiConfigId: null,
   name: "",
   code: "",
   fenshiURL: "",
@@ -160,22 +191,143 @@ const sortedResults = computed(() => {
 
 const groupResults = computed(() => {
   const group = {}
-  for (const key in sortedResults.value) {
-    if (stocks.value.includes(sortedResults.value[key]['股票代码'])) {
-      group[key] = sortedResults.value[key]
+  if (currentGroupId.value === 0) {
+    return sortedResults.value
+  } else {
+    for (const key in sortedResults.value) {
+      if (stocks.value.includes(sortedResults.value[key]['股票代码'])) {
+        group[key] = sortedResults.value[key]
+      }
     }
+    return group
   }
-  return group
 })
 const showPopover = ref(false)
+// 拖拽相关变量
+const dragSourceIndex = ref(null)
+const dragTargetIndex = ref(null)
+
+// 拖拽处理函数
+function handleTabDragStart(event, name) {
+  // "全部"标签（name=0）不应该触发拖拽
+  if (name === 0) {
+    event.preventDefault();
+    return;
+  }
+  dragSourceIndex.value = name;
+  event.dataTransfer.effectAllowed = 'move';
+  event.target.classList.add('tab-dragging');
+}
+
+
+function handleTabDragOver(event) {
+  event.preventDefault()
+  event.dataTransfer.dropEffect = 'move'
+}
+
+function handleTabDragEnter(event, name) {
+  event.preventDefault();
+  // "全部"标签（name=0）不应该作为拖拽目标
+  if (name > 0) {
+    dragTargetIndex.value = name;
+    if (event.target.classList) {
+      // 查找最近的标签元素并添加高亮样式
+      let tabElement = event.target.closest('.n-tabs-tab');
+      if (tabElement) {
+        tabElement.classList.add('tab-drag-over');
+      }
+    }
+  }
+}
+
+function handleTabDragLeave(event) {
+  // 查找最近的标签元素并移除高亮样式
+  let tabElement = event.target.closest('.n-tabs-tab')
+  if (tabElement && tabElement.classList) {
+    tabElement.classList.remove('tab-drag-over')
+  }
+  // 不要重置 dragTargetIndex，因为可能会在元素间快速移动
+}
+
+function handleTabDrop(event) {
+  event.preventDefault();
+
+  // 移除所有高亮样式
+  const tabs = document.querySelectorAll('.n-tabs-tab');
+  if(!tabs || tabs.length === 0){
+    return
+  }
+  tabs.forEach(tab => {
+    tab.classList.remove('tab-drag-over');
+  });
+
+  if (dragSourceIndex.value !== null && dragTargetIndex.value !== null &&
+      dragSourceIndex.value !== dragTargetIndex.value) {
+
+    // 确保索引有效（排除"全部"选项卡）
+    if (dragSourceIndex.value > 0 && dragTargetIndex.value > 0) {
+      // 查找源分组和目标分组
+      const sourceGroup = groupList.value.find(g => g.ID === dragSourceIndex.value);
+      const targetGroup = groupList.value.find(g => g.ID === dragTargetIndex.value);
+
+      if (sourceGroup && targetGroup) {
+        // 计算新的位置序号（使用目标分组的sort值）
+        const newSortPosition = targetGroup.sort;
+
+        // 调用后端API更新组排序
+        UpdateGroupSort(sourceGroup.ID, newSortPosition).then(result => {
+          if (result) {
+            message.success('分组排序更新成功');
+            // 重新获取分组列表以更新界面
+            GetGroupList().then(result => {
+              groupList.value = result;
+            });
+          } else {
+            message.error('分组排序更新失败');
+          }
+        }).catch(error => {
+          message.error('分组排序更新失败: ' + error.message);
+        });
+      }
+    }
+  }
+
+  // 重置状态
+  dragSourceIndex.value = null;
+  dragTargetIndex.value = null;
+}
+
+function handleTabDragEnd(event) {
+  // 移除所有高亮样式
+  const tabs = document.querySelectorAll('.n-tabs-tab')
+  if(!tabs || tabs.length === 0){
+    return
+  }
+  tabs.forEach(tab => {
+    tab.classList.remove('tab-drag-over', 'tab-dragging')
+  })
+
+  dragSourceIndex.value = null
+  dragTargetIndex.value = null
+}
 
 onBeforeMount(() => {
   GetGroupList().then(result => {
     groupList.value = result
-    if (route.query.groupId) {
-      message.success("切换分组:" + route.query.groupName)
-      currentGroupId.value = Number(route.query.groupId)
-      //console.log("route.params",route.query)
+    // 检查是否存在相同的序号
+    const sorts = result.map(item => item.sort);
+    const uniqueSorts = new Set(sorts);
+    // 如果存在重复的序号，则重新初始化序号
+    if (sorts.length !== uniqueSorts.size) {
+      // 调用InitializeGroupSort重新初始化序号
+      // 然后重新获取分组列表
+      fetchGroupList();
+    } else {
+      // 没有重复序号，继续正常流程
+      if (route.query.groupId) {
+        message.success("切换分组:" + route.query.groupName)
+        currentGroupId.value = Number(route.query.groupId)
+      }
     }
   })
   GetStockList("").then(result => {
@@ -204,15 +356,167 @@ onBeforeMount(() => {
     sysPromptOptions.value = promptTemplates.value.filter(item => item.type === '模型系统Prompt')
     userPromptOptions.value = promptTemplates.value.filter(item => item.type === '模型用户Prompt')
 
-    //console.log("userPromptOptions",userPromptOptions.value)
-    //console.log("sysPromptOptions",sysPromptOptions.value)
   })
 
+  GetAiConfigs().then(res => {
+    aiConfigs.value = res
+    data.aiConfigId = res[0].ID
+  })
+
+  EventsOn("loadingDone", (data) => {
+    message.loading("刷新股票基础数据...")
+    GetStockList("").then(result => {
+      stockList.value = result
+      options.value = result.map(item => {
+        return {
+          label: item.name + " - " + item.ts_code,
+          value: item.ts_code
+        }
+      })
+    })
+  })
+
+  EventsOn("refresh", (data) => {
+    message.success(data)
+  })
+
+  EventsOn("showSearch", (data) => {
+    addBTN.value = data === 1;
+  })
+
+  EventsOn("stock_price", (data) => {
+    updateData(data)
+  })
+
+  EventsOn("refreshFollowList", (data) => {
+
+    WindowReload()
+  })
+
+  EventsOn("newChatStream", async (msg) => {
+    data.loading = false
+    if (msg === "DONE") {
+      SaveAIResponseResult(data.code, data.name, data.airesult, data.chatId, data.question, data.aiConfigId)
+      message.info("AI分析完成！")
+      message.destroyAll()
+    } else {
+      if (msg.chatId) {
+        data.chatId = msg.chatId
+      }
+      if (msg.question) {
+        data.question = msg.question
+      }
+      if (msg.content) {
+        data.airesult = data.airesult + msg.content
+      }
+      if (msg.extraContent) {
+        data.airesult = data.airesult + msg.extraContent
+      }
+
+    }
+  })
+
+  EventsOn("changeTab", async (msg) => {
+    currentGroupId.value = Number(msg.ID)
+    nextTick(() => {
+      updateTab(currentGroupId.value);
+    });
+  })
+
+
+  EventsOn("updateVersion", async (msg) => {
+    const githubTimeStr = msg.published_at;
+    // 创建一个 Date 对象
+    const utcDate = new Date(githubTimeStr);
+// 获取本地时间
+    const date = new Date(utcDate.getTime());
+    const year = date.getFullYear();
+// getMonth 返回值是 0 - 11，所以要加 1
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+
+    const formattedDate = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+
+    notify.info({
+      avatar: () =>
+          h(NAvatar, {
+            size: 'small',
+            round: false,
+            src: icon.value
+          }),
+      title: '发现新版本: ' + msg.tag_name,
+      content: () => {
+        //return h(MdPreview, {theme:'dark',modelValue:msg.commit?.message}, null)
+        return h('div', {
+          style: {
+            'text-align': 'left',
+            'font-size': '14px',
+          }
+        }, {default: () => msg.commit?.message})
+      },
+      duration: 5000,
+      meta: "发布时间:" + formattedDate,
+      action: () => {
+        return h(NButton, {
+          type: 'primary',
+          size: 'small',
+          onClick: () => {
+            Environment().then(env => {
+              switch (env.platform) {
+                case 'windows':
+                  window.open(msg.html_url)
+                  break
+                default :
+                  OpenURL(msg.html_url)
+              }
+            })
+          }
+        }, {default: () => '查看'})
+      }
+    })
+  })
+
+  EventsOn("warnMsg", async (msg) => {
+    notify.error({
+      avatar: () =>
+          h(NAvatar, {
+            size: 'small',
+            round: false,
+            src: icon.value
+          }),
+      title: '警告',
+      duration: 5000,
+      content: () => {
+        return h('div', {
+          style: {
+            'text-align': 'left',
+            'font-size': '14px',
+          }
+        }, {default: () => msg})
+      },
+    })
+  })
 })
+// 监听分组列表变化，重新初始化拖拽
+const unwatch = watch(groupList, () => {
+  nextTick(() => {
+    initDraggableTabs();
+  });
+});
 
+// 在组件卸载时清理监听器
+onBeforeUnmount(() => {
+  unwatch();
+});
 onMounted(() => {
-  message.loading("Loading...")
+  nextTick(() => {
+    initDraggableTabs();
+  });
 
+  message.loading("Loading...")
   GetFollowList(currentGroupId.value).then(result => {
 
     followList.value = result
@@ -223,15 +527,18 @@ onMounted(() => {
       if (!stocks.value.includes(followedStock.StockCode)) {
         stocks.value.push(followedStock.StockCode)
       }
+      Greet(followedStock.StockCode).then(result => {
+        updateData(result)
+      })
     }
-    monitor()
+    //monitor()
     message.destroyAll()
   })
 
-
   GetVersionInfo().then((res) => {
-    icon.value = res.icon;
-  });
+    icon.value = res.icon
+    refreshEffectiveVip()
+  })
   // 创建 WebSocket 连接
   ws.value = new WebSocket('ws://8.134.249.145:16688/ws'); // 替换为你的 WebSocket 服务器地址
   //ws.value = new WebSocket('ws://localhost:16688/ws'); // 替换为你的 WebSocket 服务器地址
@@ -254,6 +561,54 @@ onMounted(() => {
     //console.log('WebSocket 连接已关闭');
   };
 })
+// 清理拖拽事件监听器
+// 清理拖拽事件监听器
+function cleanupDraggableTabs() {
+  const tabs = document.querySelectorAll('.n-tabs-tab');
+  if(!tabs || tabs.length === 0){
+    return
+  }
+  tabs.forEach((tab) => {
+    // 移除所有可能的拖拽事件监听器
+    tab.removeEventListener('dragstart', handleTabDragStart);
+    tab.removeEventListener('dragover', handleTabDragOver);
+    tab.removeEventListener('dragenter', handleTabDragEnter);
+    tab.removeEventListener('dragleave', handleTabDragLeave);
+    tab.removeEventListener('drop', handleTabDrop);
+    tab.removeEventListener('dragend', handleTabDragEnd);
+    // 移除draggable属性
+    tab.removeAttribute('draggable');
+  });
+}
+
+// 初始化可拖拽选项卡
+function initDraggableTabs() {
+  // 移除之前可能添加的事件监听器
+  cleanupDraggableTabs();
+
+  // 添加拖拽事件监听器到选项卡元素
+  setTimeout(() => {
+    const tabs = document.querySelectorAll('.n-tabs-tab');
+    if(!tabs || tabs.length === 0){
+      return
+    }
+    tabs.forEach((tab, index) => {
+      const dataIndex = tab.getAttribute('data-name');
+      const name = parseInt(dataIndex);
+
+      // 只为分组标签（name > 0）添加拖拽功能
+      if (name > 0) {
+        tab.setAttribute('draggable', 'true');
+        tab.addEventListener('dragstart', (e) => handleTabDragStart(e, name));
+        tab.addEventListener('dragover', handleTabDragOver);
+        tab.addEventListener('dragenter', (e) => handleTabDragEnter(e, name));
+        tab.addEventListener('dragleave', handleTabDragLeave);
+        tab.addEventListener('drop', handleTabDrop);
+        tab.addEventListener('dragend', handleTabDragEnd);
+      }
+    });
+  }, 100);
+}
 
 onBeforeUnmount(() => {
   // //console.log(`the component is now unmounted.`)
@@ -262,6 +617,11 @@ onBeforeUnmount(() => {
   message.destroyAll()
   notify.destroyAll()
   clearInterval(feishiInterval.value)
+  // 清理多周期 K 线自动关闭定时器
+  if (klineAutoCloseTimer.value) {
+    clearTimeout(klineAutoCloseTimer.value)
+    klineAutoCloseTimer.value = null
+  }
 
   EventsOff("refresh")
   EventsOff("showSearch")
@@ -272,138 +632,9 @@ onBeforeUnmount(() => {
   EventsOff("updateVersion")
   EventsOff("warnMsg")
   EventsOff("loadingDone")
-})
 
-EventsOn("loadingDone", (data) => {
-  message.loading("刷新股票基础数据...")
-  GetStockList("").then(result => {
-    stockList.value = result
-    options.value = result.map(item => {
-      return {
-        label: item.name + " - " + item.ts_code,
-        value: item.ts_code
-      }
-    })
-  })
-})
+  cleanupDraggableTabs()
 
-EventsOn("refresh", (data) => {
-  message.success(data)
-})
-
-EventsOn("showSearch", (data) => {
-  addBTN.value = data === 1;
-})
-
-EventsOn("stock_price", (data) => {
-  updateData(data)
-})
-
-EventsOn("refreshFollowList", (data) => {
-
-  WindowReload()
-})
-
-EventsOn("newChatStream", async (msg) => {
-  ////console.log("newChatStream:->",data.airesult)
-  data.loading = false
-  ////console.log(msg)
-  if (msg === "DONE") {
-    SaveAIResponseResult(data.code, data.name, data.airesult, data.chatId, data.question)
-    message.info("AI分析完成！")
-    message.destroyAll()
-  } else {
-    if (msg.chatId) {
-      data.chatId = msg.chatId
-    }
-    if (msg.question) {
-      data.question = msg.question
-    }
-    if (msg.content) {
-      data.airesult = data.airesult + msg.content
-    }
-    if (msg.extraContent) {
-      data.airesult = data.airesult + msg.extraContent
-    }
-
-  }
-})
-
-EventsOn("changeTab", async (msg) => {
-  //console.log("changeTab",msg)
-  currentGroupId.value = msg.ID
-  updateTab(currentGroupId.value)
-})
-
-
-EventsOn("updateVersion", async (msg) => {
-  const githubTimeStr = msg.published_at;
-  // 创建一个 Date 对象
-  const utcDate = new Date(githubTimeStr);
-// 获取本地时间
-  const date = new Date(utcDate.getTime());
-  const year = date.getFullYear();
-// getMonth 返回值是 0 - 11，所以要加 1
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-
-  const formattedDate = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-
-  //console.log("GitHub UTC 时间:", utcDate);
-  //console.log("转换后的本地时间:", formattedDate);
-  notify.info({
-    avatar: () =>
-        h(NAvatar, {
-          size: 'small',
-          round: false,
-          src: icon.value
-        }),
-    title: '发现新版本: ' + msg.tag_name,
-    content: () => {
-      //return h(MdPreview, {theme:'dark',modelValue:msg.commit?.message}, null)
-      return h('div', {
-        style: {
-          'text-align': 'left',
-          'font-size': '14px',
-        }
-      }, {default: () => msg.commit?.message})
-    },
-    duration: 5000,
-    meta: "发布时间:" + formattedDate,
-    action: () => {
-      return h(NButton, {
-        type: 'primary',
-        size: 'small',
-        onClick: () => {
-          window.open(msg.html_url)
-        }
-      }, {default: () => '查看'})
-    }
-  })
-})
-
-EventsOn("warnMsg", async (msg) => {
-  notify.error({
-    avatar: () =>
-        h(NAvatar, {
-          size: 'small',
-          round: false,
-          src: icon.value
-        }),
-    title: '警告',
-    duration: 5000,
-    content: () => {
-      return h('div', {
-        style: {
-          'text-align': 'left',
-          'font-size': '14px',
-        }
-      }, {default: () => msg})
-    },
-  })
 })
 
 //判断是否是A股交易时间
@@ -426,6 +657,23 @@ function isTradingTime() {
   return false;
 }
 
+// 添加一个获取分组列表的函数，用于处理初始化逻辑
+function fetchGroupList() {
+  InitializeGroupSort().then(initResult => {
+    if (initResult) {
+      GetGroupList().then(result => {
+        groupList.value = result
+        if (route.query.groupId) {
+          message.success("切换分组:" + route.query.groupName)
+          currentGroupId.value = Number(route.query.groupId)
+        }
+      })
+    } else {
+      message.error("初始化分组序号失败")
+    }
+  })
+}
+
 function AddStock() {
   if (!data?.code) {
     message.error("请输入有效股票代码");
@@ -435,7 +683,7 @@ function AddStock() {
     Follow(data.code).then(result => {
       if (result === "关注成功") {
         if (data.code.startsWith("us")) {
-          data.code= "gb_" + data.code.replace("us", "").toLowerCase()
+          data.code = "gb_" + data.code.replace("us", "").toLowerCase()
         }
         stocks.value.push(data.code)
         message.success(result)
@@ -464,6 +712,7 @@ function removeMonitor(code, name, key) {
 
   UnFollow(code).then(result => {
     message.success(result)
+    monitor()
   })
 }
 
@@ -549,17 +798,19 @@ async function updateData(result) {
     result.profitType = "success"
   }
   if (result["当前价格"]) {
-    if (result.alarmChangePercent > 0 && Math.abs(result.changePercent) >= result.alarmChangePercent) {
-      SendMessage(result, 1)
-    }
+    // if (result.alarmChangePercent > 0 && Math.abs(result.changePercent) >= result.alarmChangePercent) {
+    //   SendMessage(result, 1)
+    // }
 
-    if (result.alarmPrice > 0 && result["当前价格"] >= result.alarmPrice) {
-      SendMessage(result, 2)
-    }
+    // if (result.alarmPrice > 0 && result["当前价格"] >= result.alarmPrice) {
+    //   SendMessage(result, 2)
+    // }
 
-    if (result.costPrice > 0 && result["当前价格"] >= result.costPrice) {
-      SendMessage(result, 3)
-    }
+    // if (result.costPrice > 0 && result["当前价格"] >= result.costPrice) {
+    //   SendMessage(result, 3)
+    // }
+
+    checkPriceLineAlerts(result)
   }
 
   // result.key=result.sort
@@ -581,7 +832,6 @@ async function monitor() {
     showPopover.value = true
   }
   for (let code of stocks.value) {
-
     Greet(code).then(result => {
       updateData(result)
     })
@@ -590,8 +840,7 @@ async function monitor() {
 
 
 function GetSortKey(sort, code) {
-  let sortKey = padStart(sort, 8, '0') + "_" + code
-  return sortKey
+  return padStart(sort, 8, '0') + "_" + code
 }
 
 function onSelect(item) {
@@ -609,12 +858,28 @@ function onSelect(item) {
 function openCenteredWindow(url, width, height) {
   const left = (window.screen.width - width) / 2;
   const top = (window.screen.height - height) / 2;
+  Environment().then(env => {
+    switch (env.platform) {
+      case 'windows':
+        window.open(
+            url,
+            'centeredWindow',
+            `width=${width},height=${height},left=${left},top=${top},location=no,menubar=no,toolbar=no,display=standalone`
+        )
+        break
+      default :
+        OpenURL(url)
+        break
+    }
+  })
 
-  return window.open(
-      url,
-      'centeredWindow',
-      `width=${width},height=${height},left=${left},top=${top}`
-  );
+
+  //
+  // return window.open(
+  //     url,
+  //     'centeredWindow',
+  //     `width=${width},height=${height},left=${left},top=${top}`
+  // );
 }
 
 function search(code, name) {
@@ -626,9 +891,75 @@ function search(code, name) {
     //window.open("https://www.iwencai.com/unifiedwap/result?w=" + name)
     //window.open("https://www.iwencai.com/chat/?question="+code)
 
-    openCenteredWindow("https://www.iwencai.com/unifiedwap/result?w=" + name,1000,800)
+    openCenteredWindow("https://www.iwencai.com/unifiedwap/result?w=" + name, 1000, 800)
 
   }, 500)
+}
+
+function handleLongEntryPriceUpdate(newPrice) {
+  console.log('[DEBUG handleLongEntryPriceUpdate] called, newPrice:', newPrice, 'type:', typeof newPrice)
+  currentStockTradingPrice.value.entryPrice = newPrice
+  console.log('[DEBUG handleLongEntryPriceUpdate] after assignment, entryPrice:', currentStockTradingPrice.value.entryPrice)
+  saveTradingPriceToBackend()
+}
+
+function handleLongStopLossPriceUpdate(newPrice) {
+  console.log('[DEBUG handleLongStopLossPriceUpdate] called, newPrice:', newPrice, 'type:', typeof newPrice)
+  currentStockTradingPrice.value.stopLossPrice = newPrice
+  saveTradingPriceToBackend()
+}
+
+function handleLongTakeProfitPriceUpdate(newPrice) {
+  console.log('[DEBUG handleLongTakeProfitPriceUpdate] called, newPrice:', newPrice, 'type:', typeof newPrice)
+  currentStockTradingPrice.value.takeProfitPrice = newPrice
+  saveTradingPriceToBackend()
+}
+
+function handleCostPriceUpdate(newPrice) {
+  console.log('[DEBUG handleCostPriceUpdate] called, newPrice:', newPrice, 'type:', typeof newPrice)
+  currentStockTradingPrice.value.costPrice = newPrice
+  saveTradingPriceToBackend()
+}
+
+function saveTradingPriceToBackend() {
+  console.log('[DEBUG saveTradingPriceToBackend] called, stockCode:', currentStockTradingPrice.value.stockCode)
+  if (!currentStockTradingPrice.value.stockCode) {
+    console.log('[DEBUG saveTradingPriceToBackend] early return - no stockCode')
+    return
+  }
+  const emCode = currentStockTradingPrice.value.stockCode
+  const code = fromEastMoneyCode(emCode)
+  if (!code) {
+    console.warn('[saveTradingPriceToBackend] 无法转换股票代码:', emCode)
+    return
+  }
+  const entryPrice = Number(currentStockTradingPrice.value.entryPrice) || 0
+  const takeProfitPrice = Number(currentStockTradingPrice.value.takeProfitPrice) || 0
+  const stopLossPrice = Number(currentStockTradingPrice.value.stopLossPrice) || 0
+  const costPrice = Number(currentStockTradingPrice.value.costPrice) || 0
+  console.log('[DEBUG saveTradingPriceToBackend] calling SetTradingPrice with:', code, entryPrice, takeProfitPrice, stopLossPrice, costPrice)
+  SetTradingPrice(
+    code,
+    entryPrice,
+    takeProfitPrice,
+    stopLossPrice,
+    costPrice
+  ).then(result => {
+    console.log('[DEBUG saveTradingPriceToBackend] SetTradingPrice result:', result)
+    if (result === '设置成功') {
+      const emCode = currentStockTradingPrice.value.stockCode
+      const internalCode = code
+      const followItem = followList.value.find(item => item.StockCode === internalCode || item.StockCode === emCode)
+      if (followItem) {
+        followItem.EntryPrice = entryPrice
+        followItem.TakeProfitPrice = takeProfitPrice
+        followItem.StopLossPrice = stopLossPrice
+        console.log('[DEBUG saveTradingPriceToBackend] updated followList item')
+      }
+    }
+  }).catch(err => {
+    console.error('[DEBUG saveTradingPriceToBackend] SetTradingPrice error:', err)
+  })
 }
 
 function setStock(code, name) {
@@ -642,6 +973,9 @@ function setStock(code, name) {
   formModel.value.alarmPrice = res[0].AlarmPrice
   formModel.value.sort = res[0].Sort
   formModel.value.cron = res[0].Cron
+  formModel.value.entryPrice = res[0].EntryPrice || 0
+  formModel.value.takeProfitPrice = res[0].TakeProfitPrice || 0
+  formModel.value.stopLossPrice = res[0].StopLossPrice || 0
   modalShow.value = true
 }
 
@@ -1249,6 +1583,109 @@ function showMoney(code, name) {
   modalShow5.value = true
 }
 
+/** 新浪/应用内代码转为东方财富接口常用格式（如 600519.SH） */
+function toEastMoneyCode(code) {
+  if (!code) return ''
+  const c = String(code).trim()
+  if (c.toLowerCase().startsWith('gb_')) return ''
+  if (/\.(SH|SZ|BJ|HK|SS)$/i.test(c)) return c.toUpperCase()
+  const lower = c.toLowerCase()
+  if (lower.startsWith('sh')) return lower.slice(2) + '.SH'
+  if (lower.startsWith('sz')) return lower.slice(2) + '.SZ'
+  if (lower.startsWith('bj')) return lower.slice(2) + '.BJ'
+  if (lower.startsWith('hk')) return lower.slice(2).toUpperCase() + '.HK'
+  if (/^\d+$/.test(c)) {
+    const d = c[0]
+    if (d === '6') return c + '.SH'
+    if (d === '0' || d === '3') return c + '.SZ'
+    if (d === '8' || d === '9') return c + '.BJ'
+    return c + '.SZ'
+  }
+  return c.toUpperCase()
+}
+
+/** 东方财富格式转回应用内部代码格式（如 000001.SZ → sh000001） */
+function fromEastMoneyCode(emCode) {
+  if (!emCode) return ''
+  const c = String(emCode).trim().toUpperCase()
+  if (c.endsWith('.SH')) return 'sh' + c.slice(0, -3)
+  if (c.endsWith('.SZ')) return 'sz' + c.slice(0, -3)
+  if (c.endsWith('.BJ')) return 'bj' + c.slice(0, -3)
+  if (c.endsWith('.HK')) return 'hk' + c.slice(0, -3).toLowerCase()
+  return c.toLowerCase()
+}
+
+async function refreshEffectiveVip() {
+  try {
+    const r = await GetEffectiveSponsorVip()
+    const active = !!r?.active
+    const lvl = Number(r?.vipLevel ?? 0)
+    vipLevel.value = active && !Number.isNaN(lvl) ? lvl : 0
+  } catch (_) {
+    vipLevel.value = 0
+  }
+}
+
+async function showLightweightKline(code, name) {
+  const em = toEastMoneyCode(code)
+  if (!em) {
+    message.warning('当前代码暂不支持东方财富多周期K线（美股等请使用「日K」图）')
+    return
+  }
+  lwKlineCode.value = em
+  lwKlineName.value = name || ''
+
+  // 刷新自选列表，确保获取最新的交易价格数据
+  try {
+    const list = await GetFollowList(currentGroupId.value)
+    followList.value = list || []
+  } catch (e) {
+    console.error('[showLightweightKline] 刷新自选列表失败:', e)
+  }
+
+  // 从自选列表中获取交易价格
+  // lwKlineCode 格式为 000001.SZ，followList 中的 StockCode 格式为 sh000001
+  // 需要进行格式转换来匹配
+  let followListCode = code
+  if (code.startsWith('sh') || code.startsWith('sz') || code.startsWith('bj') || code.startsWith('hk')) {
+    // 如果是 sh000001 格式，转换为东方财富格式
+    const market = code.slice(0, 2).toUpperCase()
+    const stockNum = code.slice(2)
+    followListCode = stockNum + '.' + market
+  }
+
+  const stockInfo = followList.value.find(item => item.StockCode === code || item.StockCode === followListCode)
+  if (stockInfo) {
+    currentStockTradingPrice.value.stockCode = lwKlineCode.value  // 使用东方财富格式
+    currentStockTradingPrice.value.costPrice = stockInfo.CostPrice || 0
+    currentStockTradingPrice.value.entryPrice = stockInfo.EntryPrice || 0
+    currentStockTradingPrice.value.takeProfitPrice = stockInfo.TakeProfitPrice || 0
+    currentStockTradingPrice.value.stopLossPrice = stockInfo.StopLossPrice || 0
+  } else {
+    currentStockTradingPrice.value.stockCode = lwKlineCode.value
+    currentStockTradingPrice.value.costPrice = 0
+    currentStockTradingPrice.value.entryPrice = 0
+    currentStockTradingPrice.value.takeProfitPrice = 0
+    currentStockTradingPrice.value.stopLossPrice = 0
+  }
+
+  await refreshEffectiveVip()
+  // 检查 VIP 权限：有效期内 VIP2 及以上（与 AI 助手 Web 端校验一致）
+  if (vipLevel.value < 2) {
+    message.warning('多周期 K 线仅限 VIP2 及以上用户使用，您当前权限不足，将在 10 秒后自动关闭')
+    lwKlineCode.value = em
+    lwKlineName.value = name || ''
+    modalShow6.value = true
+    // 10 秒后自动关闭
+    klineAutoCloseTimer.value = setTimeout(() => {
+      modalShow6.value = false
+      message.info('权限不足，多周期 K 线已自动关闭')
+    }, 10000)
+    return
+  }
+  modalShow6.value = true
+}
+
 function showK(code, name) {
   data.code = code
   data.name = name
@@ -1282,6 +1719,14 @@ function updateCostPriceAndVolumeNew(code, price, volume, alarm, formModel) {
       //message.success(result)
     })
   }
+  
+  // 保存交易价格（开仓价、止盈价、止损价、成本价）
+  if (formModel.entryPrice || formModel.takeProfitPrice || formModel.stopLossPrice || formModel.costPrice) {
+    SetTradingPrice(code, formModel.entryPrice || 0, formModel.takeProfitPrice || 0, formModel.stopLossPrice || 0, formModel.costPrice || 0).then(result => {
+      //message.success(result)
+    })
+  }
+  
   SetCostPriceAndVolume(code, price, volume).then(result => {
     modalShow.value = false
     message.success(result)
@@ -1340,6 +1785,79 @@ function SendMessage(result, type) {
   SendDingDingMessageByType(msg, result["股票代码"], type)
 }
 
+const priceLineAlertCache = new Map()
+
+function checkPriceLineAlerts(result) {
+  const code = result["股票代码"]
+  const price = result["当前价格"]
+  if (!price || price <= 0) return
+
+  const followedStock = followList.value.find(s => {
+    const sCode = s.StockCode || ''
+    return sCode === code || sCode === 'sh' + code || sCode === 'sz' + code ||
+           sCode === code.replace('sh', '').replace('sz', '') ||
+           (sCode.length > 2 && code.length > 2 && sCode.includes(code.slice(2)))
+  })
+
+  if (!followedStock) return
+
+  const alerts = []
+  let triggeredType = 0
+  if (followedStock.EntryPrice > 0) {
+    const diff = ((price - followedStock.EntryPrice) / followedStock.EntryPrice * 100).toFixed(2)
+    alerts.push(`开仓价: ${followedStock.EntryPrice} (${diff >= 0 ? '+' : ''}${diff}%)`)
+  }
+  if (followedStock.TakeProfitPrice > 0) {
+    if (price >= followedStock.TakeProfitPrice) {
+      alerts.push(`止盈价: ${followedStock.TakeProfitPrice} ⚠️ 已触及`)
+      triggeredType = 4
+    } else {
+      const diff = ((followedStock.TakeProfitPrice - price) / followedStock.TakeProfitPrice * 100).toFixed(2)
+      alerts.push(`止盈价: ${followedStock.TakeProfitPrice} (距离 ${diff}%)`)
+    }
+  }
+  if (followedStock.StopLossPrice > 0) {
+    if (price <= followedStock.StopLossPrice) {
+      alerts.push(`止损价: ${followedStock.StopLossPrice} ⚠️ 已触及`)
+      triggeredType = 5
+    } else {
+      const diff = ((price - followedStock.StopLossPrice) / followedStock.StopLossPrice * 100).toFixed(2)
+      alerts.push(`止损价: ${followedStock.StopLossPrice} (+${diff}%)`)
+    }
+  }
+
+  if (alerts.length === 0) return
+
+  const cacheKey = `${code}_${price}`
+  if (priceLineAlertCache.get(cacheKey)) return
+
+  const notifyKey = `${code}_notify`
+  const lastNotify = priceLineAlertCache.get(notifyKey) || 0
+  const now = Date.now()
+  if (now - lastNotify < 60000) return
+
+  priceLineAlertCache.set(cacheKey, true)
+  priceLineAlertCache.set(notifyKey, now)
+
+  const stockName = followedStock.Name || followedStock.StockName || result["股票名称"] || code
+  const stockCodeDisplay = code.length > 6 ? code : code.toUpperCase()
+
+  // notify.info({
+  //   avatar: () => h(NAvatar, { size: 'small', round: false, src: icon.value }),
+  //   title: `📈 ${stockName} (${stockCodeDisplay})`,
+  //   duration: 5000,
+  //   meta: `当前价: ${price}`,
+  //   content: () => h('div', { style: { 'text-align': 'left', 'font-size': '13px' } },
+  //     alerts.map(a => h('div', { style: { 'margin-bottom': '4px' } }, a))
+  //   ),
+  // })
+
+  if (triggeredType > 0) {
+    const msg = `### 📈 价位线预警\n\n### ${stockName} (${stockCodeDisplay})\n\n- 当前价格: ${price}\n- 预警类型: ${triggeredType === 4 ? '止盈触及' : '止损触及'}\n- 开仓价: ${followedStock.EntryPrice || '-'}\n- 止盈价: ${followedStock.TakeProfitPrice || '-'}\n- 止损价: ${followedStock.StopLossPrice || '-'}`;
+    SendDingDingMessageByType(msg, code, triggeredType)
+  }
+}
+
 function aiReCheckStock(stock, stockCode) {
   data.modelName = ""
   data.airesult = ""
@@ -1354,7 +1872,7 @@ function aiReCheckStock(stock, stockCode) {
   //
 
   //message.info("sysPromptId:"+data.sysPromptId)
-  NewChatStream(stock, stockCode, data.question, data.sysPromptId)
+  NewChatStream(stock, stockCode, data.question, data.aiConfigId, data.sysPromptId, enableTools.value,thinkingMode.value)
 }
 
 function aiCheckStock(stock, stockCode) {
@@ -1383,12 +1901,12 @@ function aiCheckStock(stock, stockCode) {
       data.time = ""
       data.name = stock
       data.code = stockCode
-      data.loading = true
+      data.loading = false
       modalShow4.value = true
-      message.loading("ai检测中...", {
-        duration: 0,
-      })
-      NewChatStream(stock, stockCode, "", data.sysPromptId)
+      // message.loading("ai检测中...", {
+      //   duration: 0,
+      // })
+      // NewChatStream(stock, stockCode, "", data.sysPromptId)
     }
   })
 }
@@ -1432,21 +1950,42 @@ window.onerror = function (msg, source, lineno, colno, error) {
 };
 
 function saveAsImage(name, code) {
-  const element = document.querySelector('.md-editor-preview');
-  if (element) {
-    html2canvas(element, {
-      useCORS: true, // 解决跨域图片问题
-      scale: 2, // 提高截图质量
-      allowTaint: true, // 允许跨域图片
-    }).then(canvas => {
-      const link = document.createElement('a');
-      link.href = canvas.toDataURL('image/png');
-      link.download = name + "[" + code + ']-ai-analysis-result.png';
-      link.click();
-    });
-  } else {
-    message.error('无法找到分析结果元素');
-  }
+  Environment().then(env => {
+    switch (env.platform) {
+      case 'windows':
+        const element = document.querySelector('.md-editor-preview');
+        if (element) {
+          html2canvas(element, {
+            useCORS: true, // 解决跨域图片问题
+            scale: 2, // 提高截图质量
+            allowTaint: true, // 允许跨域图片
+          }).then(canvas => {
+            const link = document.createElement('a');
+            link.href = canvas.toDataURL('image/png');
+            link.download = name + "[" + code + ']-ai-analysis-result.png';
+            link.click();
+          });
+        } else {
+          message.error('无法找到分析结果元素');
+        }
+        break
+      default :
+        saveCanvasImage(name)
+    }
+  })
+}
+
+async function saveCanvasImage(name) {
+  const element = document.querySelector('.md-editor-preview'); // 要截图的 DOM 节点
+  const canvas = await html2canvas(element)
+
+  const dataUrl = canvas.toDataURL('image/png') // base64 格式
+  const base64 = dataUrl.replace(/^data:image\/png;base64,/, '')
+
+  // 调用 Go 后端保存文件（Wails 绑定方法）
+  await SaveImage(name, base64).then(result => {
+    message.success(result)
+  })
 }
 
 async function copyToClipboard() {
@@ -1506,13 +2045,26 @@ AI赋能股票分析：自选股行情获取，成本盈亏展示，涨跌报警
 `
   // landscape就是横着的，portrait是竖着的，默认是竖屏portrait。
   const blob = await asBlob(value, {orientation: 'portrait'})
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = `${data.name}[${data.code}]-ai-analysis-result.docx`;
-  a.click()
-  // 下载后将标签移除
-  URL.revokeObjectURL(a.href);
-  a.remove()
+  const {platform} = await Environment()
+  switch (platform) {
+    case 'windows':
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `${data.name}[${data.code}]-ai-analysis-result.docx`;
+      a.click()
+      // 下载后将标签移除
+      URL.revokeObjectURL(a.href);
+      a.remove()
+      break
+    default:
+      const arrayBuffer = await blob.arrayBuffer()
+      const uint8Array = new Uint8Array(arrayBuffer)
+      const binary = uint8Array.reduce((data, byte) => data + String.fromCharCode(byte), '')
+      const base64 = btoa(binary)
+      await SaveWordFile(`${data.name}[${data.code}]-ai-analysis-result.docx`, base64).then(result => {
+        message.success(result)
+      })
+  }
 }
 
 function share(code, name) {
@@ -1573,24 +2125,28 @@ function AddStockGroupInfo(groupId, code, name) {
 }
 
 function updateTab(name) {
-  currentGroupId.value = Number(name)
-  GetFollowList(currentGroupId.value).then(result => {
-    stocks.value = []
+  stocks.value = []
+  const tabId= Number(name)
+  currentGroupId.value = tabId;
+  GetFollowList(tabId).then(result => {
     followList.value = result
+
     for (const followedStock of result) {
       if (followedStock.StockCode.startsWith("us")) {
         followedStock.StockCode = "gb_" + followedStock.StockCode.replace("us", "").toLowerCase()
       }
-      ////console.log("followList",followedStock.StockCode)
       stocks.value.push(followedStock.StockCode)
+      Greet(followedStock.StockCode).then(result => {
+        updateData(result)
+      })
     }
-    monitor()
+    //monitor()
     message.destroyAll()
   })
 }
 
-function delTab(name) {
-  let infos = groupList.value = groupList.value.filter(item => item.ID === Number(name))
+function delTab(groupId) {
+  let infos = groupList.value = groupList.value.filter(item => item.ID === Number(groupId))
   dialog.create({
     title: '删除分组',
     type: 'warning',
@@ -1598,7 +2154,7 @@ function delTab(name) {
     positiveText: '确定',
     negativeText: '取消',
     onPositiveClick: () => {
-      RemoveGroup(name).then(result => {
+      RemoveGroup(Number(groupId)).then(result => {
         message.info(result)
         GetGroupList().then(result => {
           groupList.value = result
@@ -1634,6 +2190,14 @@ function searchStockReport(stockCode) {
     },
   })
 }
+
+// 监听多周期 K 线模态框关闭，清除定时器
+watch(modalShow6, (newVal) => {
+  if (!newVal && klineAutoCloseTimer.value) {
+    clearTimeout(klineAutoCloseTimer.value)
+    klineAutoCloseTimer.value = null
+  }
+})
 </script>
 
 <template>
@@ -1646,9 +2210,10 @@ function searchStockReport(stockCode) {
       </n-gradient-text>
     </template>
   </vue-danmaku>
-  <n-tabs type="card" style="--wails-draggable:drag" animated addable :data-currentGroupId="currentGroupId"
-          :value="currentGroupId" @add="addTab" @update-value="updateTab" placement="top" @close="(key)=>{delTab(key)}">
-    <n-tab-pane :name="0" :tab="'全部'">
+  <n-tabs type="card" style="--wails-draggable:no-drag" animated addable :data-currentGroupId="currentGroupId"
+          :value="String(currentGroupId)" @add="addTab" @update:value="updateTab" placement="top" @close="(key)=>{delTab(key)}">
+
+    <n-tab-pane closable name="0" :tab="'全部'">
       <n-grid :x-gap="8" :cols="3" :y-gap="8">
         <n-gi :id="result['股票代码']+'_gi'" v-for="result in sortedResults" style="margin-left: 2px;">
           <n-card :data-sort="result.sort" :id="result['股票代码']" :data-code="result['股票代码']" :bordered="true"
@@ -1739,19 +2304,29 @@ function searchStockReport(stockCode) {
                         @click="removeMonitor(result['股票代码'],result['股票名称'],result.key)">
                 取消关注
               </n-button>&nbsp;
+
               <n-button size="tiny" v-if="data.openAiEnable" secondary type="warning"
                         @click="aiCheckStock(result['股票名称'],result['股票代码'])">
                 AI分析
               </n-button>
-
             </template>
             <template #footer>
-              <n-flex justify="center">
-                <n-text :type="'info'">{{ result["日期"] + " " + result["时间"] }}</n-text>
-                <n-tag size="small" v-if="result.volume>0" :type="result.profitType">{{ result.volume + "股" }}</n-tag>
-                <n-tag size="small" v-if="result.costPrice>0" :type="result.profitType">
-                  {{ "成本:" + result.costPrice + "*" + result.costVolume + " " + result.profit + "%" + " ( " + result.profitAmount + " ¥ )" }}
-                </n-tag>
+              <n-flex vertical :size="8">
+                <n-flex justify="center">
+                  <n-text :type="'info'">{{ result["日期"] + " " + result["时间"] }}</n-text>
+                  <n-tag size="small" v-if="result.volume>0" :type="result.profitType">{{ result.volume + "股" }}</n-tag>
+                  <n-tag size="small" v-if="result.costPrice>0" :type="result.profitType">
+                    {{
+                      "成本:" + result.costPrice + "*" + result.costVolume + " " + result.profit + "%" + " ( " + result.profitAmount + " ¥ )"
+                    }}
+                  </n-tag>
+                </n-flex>
+                <n-flex justify="center">
+                  <n-button size="tiny" type="primary" secondary
+                            @click="showLightweightKline(result['股票代码'],result['股票名称'])">
+                    多周期K线
+                  </n-button>
+                </n-flex>
               </n-flex>
             </template>
             <template #action>
@@ -1785,14 +2360,14 @@ function searchStockReport(stockCode) {
         </n-gi>
       </n-grid>
     </n-tab-pane>
-    <n-tab-pane closable v-for="group in groupList" :group-id="group.ID" :name="group.ID" :tab="group.name">
+    <n-tab-pane closable v-for="group in groupList" :group-id="group.ID" :name="String(group.ID)" :tab="group.name">
       <n-grid :x-gap="8" :cols="3" :y-gap="8">
         <n-gi :id="result['股票代码']+'_gi'" v-for="result in groupResults" style="margin-left: 2px;">
           <n-card :data-sort="result.sort" :id="result['股票代码']" :data-code="result['股票代码']" :bordered="true"
                   :title="result['股票名称']" :closable="false"
                   @close="removeMonitor(result['股票代码'],result['股票名称'],result.key)">
-            <n-grid :cols="1" :y-gap="6">
-              <n-gi>
+            <n-grid :cols="12" :y-gap="6">
+              <n-gi :span="6">
                 <n-text :type="result.type">
                   <n-number-animation :duration="1000" :precision="2" :from="result['上次当前价格']"
                                       :to="Number(result['当前价格'])"/>
@@ -1807,6 +2382,10 @@ function searchStockReport(stockCode) {
                 <n-text size="small" v-if="result.costVolume>0" :type="result.type">
                   <n-number-animation :duration="1000" :precision="2" :from="0" :to="result.profitAmountToday"/>
                 </n-text>
+              </n-gi>
+              <n-gi :span="6">
+                <stock-spark-line :last-price="Number(result['当前价格'])" :open-price="Number(result['昨日收盘价'])"
+                                  :stock-code="result['股票代码']" :stock-name="result['股票名称']"></stock-spark-line>
               </n-gi>
             </n-grid>
             <n-grid :cols="2" :y-gap="4" :x-gap="4">
@@ -1876,21 +2455,32 @@ function searchStockReport(stockCode) {
                         @click="removeMonitor(result['股票代码'],result['股票名称'],result.key)">
                 取消关注
               </n-button>&nbsp;
+
               <n-button size="tiny" v-if="data.openAiEnable" secondary type="warning"
                         @click="aiCheckStock(result['股票名称'],result['股票代码'])">
                 AI分析
-              </n-button>&nbsp;
+              </n-button>
               <n-button secondary type="error" size="tiny"
                         @click="delStockGroup(result['股票代码'],result['股票名称'],group.ID)">移出分组
               </n-button>
             </template>
             <template #footer>
-              <n-flex justify="center">
-                <n-text :type="'info'">{{ result["日期"] + " " + result["时间"] }}</n-text>
-                <n-tag size="small" v-if="result.volume>0" :type="result.profitType">{{ result.volume + "股" }}</n-tag>
-                <n-tag size="small" v-if="result.costPrice>0" :type="result.profitType">
-                  {{ "成本:" + result.costPrice + "*" + result.costVolume + " " + result.profit + "%" + " ( " + result.profitAmount + " ¥ )" }}
-                </n-tag>
+              <n-flex vertical :size="8">
+                <n-flex justify="center">
+                  <n-text :type="'info'">{{ result["日期"] + " " + result["时间"] }}</n-text>
+                  <n-tag size="small" v-if="result.volume>0" :type="result.profitType">{{ result.volume + "股" }}</n-tag>
+                  <n-tag size="small" v-if="result.costPrice>0" :type="result.profitType">
+                    {{
+                      "成本:" + result.costPrice + "*" + result.costVolume + " " + result.profit + "%" + " ( " + result.profitAmount + " ¥ )"
+                    }}
+                  </n-tag>
+                </n-flex>
+                <n-flex justify="center">
+                  <n-button size="tiny" type="primary" secondary
+                            @click="showLightweightKline(result['股票代码'],result['股票名称'])">
+                    多周期K线
+                  </n-button>
+                </n-flex>
               </n-flex>
             </template>
             <template #action>
@@ -1925,6 +2515,7 @@ function searchStockReport(stockCode) {
       </n-grid>
     </n-tab-pane>
   </n-tabs>
+
   <div style="position: fixed;bottom: 18px;right:5px;z-index: 10;width: 400px">
     <!--    <n-card :bordered="false">-->
     <n-input-group>
@@ -1953,7 +2544,7 @@ function searchStockReport(stockCode) {
     </n-input-group>
     <!--    </n-card>-->
   </div>
-  <n-modal transform-origin="center" size="small" v-model:show="modalShow" :title="formModel.name" style="width: 400px"
+  <n-modal transform-origin="center" size="small" v-model:show="modalShow" :title="formModel.name" style="width: 800px"
            :preset="'card'">
     <n-form :model="formModel" :rules="{
               costPrice: { required: true, message: '请输入成本'},
@@ -1961,42 +2552,78 @@ function searchStockReport(stockCode) {
               alarm:{required: true, message: '涨跌报警值'} ,
               alarmPrice: { required: true, message: '请输入报警价格'},
               sort: { required: true, message: '请输入排序值'},
-            }" label-placement="left" label-width="80px">
-      <n-form-item label="股票成本" path="costPrice">
-        <n-input-number v-model:value="formModel.costPrice" min="0" placeholder="请输入股票成本">
-          <template #suffix>
-            {{ formModel.code.indexOf("hk") >= 0 ? "HK$" : "¥" }}
-          </template>
-        </n-input-number>
-      </n-form-item>
-      <n-form-item label="股票数量" path="volume">
-        <n-input-number v-model:value="formModel.volume" min="0" step="100" placeholder="请输入股票数量">
-          <template #suffix>
-            股
-          </template>
-        </n-input-number>
-      </n-form-item>
-      <n-form-item label="涨跌提醒" path="alarm">
-        <n-input-number v-model:value="formModel.alarm" min="0" placeholder="请输入涨跌报警值(%)">
-          <template #suffix>
-            %
-          </template>
-        </n-input-number>
-      </n-form-item>
-      <n-form-item label="股价提醒" path="alarmPrice">
-        <n-input-number v-model:value="formModel.alarmPrice" min="0" placeholder="请输入股价报警值(¥)">
-          <template #suffix>
-            {{ formModel.code.indexOf("hk") >= 0 ? "HK$" : "¥" }}
-          </template>
-        </n-input-number>
-      </n-form-item>
-      <n-form-item label="股票排序" path="sort">
-        <n-input-number v-model:value="formModel.sort" min="0" placeholder="请输入股价排序值">
-        </n-input-number>
-      </n-form-item>
-      <n-form-item label="AI cron" path="cron">
-        <n-input v-model:value="formModel.cron" placeholder="请输入cron表达式"/>
-      </n-form-item>
+            }" label-placement="left" label-width="100px">
+      <n-grid :cols="2" :x-gap="12">
+        <n-gi>
+          <n-form-item label="股票成本" path="costPrice">
+            <n-input-number v-model:value="formModel.costPrice" min="0" placeholder="请输入股票成本" style="width: 100%">
+              <template #suffix>
+                {{ formModel.code.indexOf("hk") >= 0 ? "HK$" : "¥" }}
+              </template>
+            </n-input-number>
+          </n-form-item>
+        </n-gi>
+        <n-gi>
+          <n-form-item label="股票数量" path="volume">
+            <n-input-number v-model:value="formModel.volume" min="0" step="100" placeholder="请输入股票数量" style="width: 100%">
+              <template #suffix>
+                股
+              </template>
+            </n-input-number>
+          </n-form-item>
+        </n-gi>
+        <n-gi>
+          <n-form-item label="涨跌提醒" path="alarm">
+            <n-input-number v-model:value="formModel.alarm" min="0" placeholder="涨跌报警值(%)" style="width: 100%">
+              <template #suffix>
+                %
+              </template>
+            </n-input-number>
+          </n-form-item>
+        </n-gi>
+        <n-gi>
+          <n-form-item label="股价提醒" path="alarmPrice">
+            <n-input-number v-model:value="formModel.alarmPrice" min="0" placeholder="股价报警值" style="width: 100%">
+              <template #suffix>
+                {{ formModel.code.indexOf("hk") >= 0 ? "HK$" : "¥" }}
+              </template>
+            </n-input-number>
+          </n-form-item>
+        </n-gi>
+        <n-gi>
+          <n-form-item label="开仓价" path="entryPrice">
+            <n-input-number v-model:value="formModel.entryPrice" min="0" step="0.01" placeholder="请输入开仓价" style="width: 100%">
+              <template #suffix>
+                {{ formModel.code.indexOf("hk") >= 0 ? "HK$" : "¥" }}
+              </template>
+            </n-input-number>
+          </n-form-item>
+        </n-gi>
+        <n-gi>
+          <n-form-item label="股票排序" path="sort">
+            <n-input-number v-model:value="formModel.sort" min="0" placeholder="排序值" style="width: 100%">
+            </n-input-number>
+          </n-form-item>
+        </n-gi>
+        <n-gi>
+          <n-form-item label="止盈价" path="takeProfitPrice">
+            <n-input-number v-model:value="formModel.takeProfitPrice" min="0" step="0.01" placeholder="请输入止盈价" style="width: 100%">
+              <template #suffix>
+                {{ formModel.code.indexOf("hk") >= 0 ? "HK$" : "¥" }}
+              </template>
+            </n-input-number>
+          </n-form-item>
+        </n-gi>
+        <n-gi>
+          <n-form-item label="止损价" path="stopLossPrice">
+            <n-input-number v-model:value="formModel.stopLossPrice" min="0" step="0.01" placeholder="请输入止损价" style="width: 100%">
+              <template #suffix>
+                {{ formModel.code.indexOf("hk") >= 0 ? "HK$" : "¥" }}
+              </template>
+            </n-input-number>
+          </n-form-item>
+        </n-gi>
+      </n-grid>
     </n-form>
     <template #footer>
       <n-button type="primary"
@@ -2045,7 +2672,7 @@ function searchStockReport(stockCode) {
   </n-modal>
 
   <n-modal transform-origin="center" v-model:show="modalShow4" preset="card" style="width: 800px;"
-           :title="'['+data.name+']AI分析结果'">
+           :title="'['+data.name+']AI分析'">
     <n-spin size="small" :show="data.loading">
       <MdEditor v-if="enableEditor" :toolbars="toolbars" ref="mdEditorRef" style="height: 440px;text-align: left"
                 :modelValue="data.airesult" :theme="theme">
@@ -2069,11 +2696,33 @@ function searchStockReport(stockCode) {
       </n-flex>
     </template>
     <template #action>
-
+      <n-flex justify="left" style="margin-bottom: 10px">
+        <n-switch v-model:value="enableTools" :round="false">
+          <template #checked>
+            工具调用
+          </template>
+          <template #unchecked>
+            非工具调用
+          </template>
+        </n-switch>
+        <n-switch v-model:value="thinkingMode" :round="false">
+          <template #checked>
+            思考模式
+          </template>
+          <template #unchecked>
+            非思考模式
+          </template>
+        </n-switch>
+        <n-gradient-text type="error" style="margin-left: 10px">
+          *AI函数工具调用可以增强AI获取数据的能力,但会消耗更多tokens。
+        </n-gradient-text>
+      </n-flex>
       <n-flex justify="space-between" style="margin-bottom: 10px">
-        <n-select style="width: 49%" v-model:value="data.sysPromptId" label-field="name" value-field="ID"
+        <n-select style="width: 31%" v-model:value="data.aiConfigId" label-field="name" value-field="ID"
+                  :options="aiConfigs" placeholder="请选择AI模型服务配置"/>
+        <n-select style="width: 31%" v-model:value="data.sysPromptId" label-field="name" value-field="ID"
                   :options="sysPromptOptions" placeholder="请选择系统提示词"/>
-        <n-select style="width: 49%" v-model:value="data.question" label-field="name" value-field="content"
+        <n-select style="width: 31%" v-model:value="data.question" label-field="name" value-field="content"
                   :options="userPromptOptions" placeholder="请选择用户提示词"/>
       </n-flex>
       <n-flex justify="right">
@@ -2087,7 +2736,7 @@ function searchStockReport(stockCode) {
             }"
         />
         <!--        <n-button size="tiny" type="error" @click="enableEditor=!enableEditor">编辑/预览</n-button>-->
-        <n-button size="tiny" type="warning" @click="aiReCheckStock(data.name,data.code)">再次分析</n-button>
+        <n-button size="tiny" type="warning" @click="aiReCheckStock(data.name,data.code)">开始AI分析</n-button>
         <n-button size="tiny" type="info" @click="saveAsImage(data.name,data.code)">保存为图片</n-button>
         <n-button size="tiny" type="success" @click="copyToClipboard">复制到剪切板</n-button>
         <n-button size="tiny" type="primary" @click="saveAsMarkdown">保存为Markdown文件</n-button>
@@ -2099,6 +2748,36 @@ function searchStockReport(stockCode) {
   <n-modal v-model:show="modalShow5" :title="data.name+'资金趋势'" style="width: 1000px" :preset="'card'">
     <money-trend :code="data.code" :name="data.name" :days="360" :dark-theme="data.darkTheme"
                  :chart-height="500"></money-trend>
+  </n-modal>
+  <n-modal
+    v-model:show="modalShow6"
+    :title="(lwKlineName || '') + ' — 多周期K线'"
+    preset="card"
+    style="width: min(1100px, 96vw); max-width: 96vw; box-sizing: border-box"
+    :content-style="{
+      maxHeight: 'min(85vh, 820px)',
+      overflowY: 'auto',
+      overflowX: 'hidden',
+      minWidth: 0,
+      boxSizing: 'border-box',
+    }"
+  >
+    <stock-lightweight-kline-chart
+      v-if="modalShow6"
+      :key="'lightweight-' + lwKlineCode"
+      :code="lwKlineCode"
+      :stock-name="lwKlineName"
+      :dark-theme="data.darkTheme"
+      :chart-height="500"
+      :long-entry-price="currentStockTradingPrice.entryPrice"
+      :long-stop-loss-price="currentStockTradingPrice.stopLossPrice"
+      :long-take-profit-price="currentStockTradingPrice.takeProfitPrice"
+      :cost-price="currentStockTradingPrice.costPrice"
+      @update:longEntryPrice="handleLongEntryPriceUpdate"
+      @update:longStopLossPrice="handleLongStopLossPriceUpdate"
+      @update:longTakeProfitPrice="handleLongTakeProfitPriceUpdate"
+      @update:costPrice="handleCostPriceUpdate"
+    />
   </n-modal>
 </template>
 
@@ -2127,5 +2806,39 @@ function searchStockReport(stockCode) {
   100% {
     border-color: red;
   }
+}
+
+/* 所有标签的通用样式 */
+:deep(.n-tabs-nav .n-tabs-tab) {
+  position: relative;
+  cursor: pointer;
+}
+
+/* 可拖拽标签的样式 */
+:deep(.n-tabs-nav .n-tabs-tab[draggable="true"]) {
+  user-select: none;
+  cursor: move;
+}
+
+.tab-drag-over {
+  background-color: #e6f7ff !important;
+  border: 2px dashed #1890ff !important;
+  transform: scale(1.02);
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.tab-drag-over::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+}
+
+.tab-dragging {
+  opacity: 0.5;
 }
 </style>

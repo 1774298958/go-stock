@@ -1,5 +1,135 @@
 export namespace data {
 	
+	export class AIConfig {
+	    ID: number;
+	    // Go type: time
+	    CreatedAt: any;
+	    // Go type: time
+	    UpdatedAt: any;
+	    name: string;
+	    baseUrl: string;
+	    apiKey: string;
+	    modelName: string;
+	    maxTokens: number;
+	    temperature: number;
+	    timeOut: number;
+	    httpProxy: string;
+	    httpProxyEnabled: boolean;
+	    sessionId: string;
+	    thinking: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AIConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.CreatedAt = this.convertValues(source["CreatedAt"], null);
+	        this.UpdatedAt = this.convertValues(source["UpdatedAt"], null);
+	        this.name = source["name"];
+	        this.baseUrl = source["baseUrl"];
+	        this.apiKey = source["apiKey"];
+	        this.modelName = source["modelName"];
+	        this.maxTokens = source["maxTokens"];
+	        this.temperature = source["temperature"];
+	        this.timeOut = source["timeOut"];
+	        this.httpProxy = source["httpProxy"];
+	        this.httpProxyEnabled = source["httpProxyEnabled"];
+	        this.sessionId = source["sessionId"];
+	        this.thinking = source["thinking"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AllStockInfoPageData {
+	    list: models.AllStockInfo[];
+	    total: number;
+	    page: number;
+	    pageSize: number;
+	    totalPages: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AllStockInfoPageData(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.list = this.convertValues(source["list"], models.AllStockInfo);
+	        this.total = source["total"];
+	        this.page = source["page"];
+	        this.pageSize = source["pageSize"];
+	        this.totalPages = source["totalPages"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AllStockInfoQuery {
+	    page: number;
+	    pageSize: number;
+	    securityCode: string;
+	    securityName: string;
+	    market: string;
+	    industry: string;
+	    concept: string;
+	    minPrice: string;
+	    maxPrice: string;
+	    minChange: string;
+	    maxChange: string;
+	    searchKeyWord: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AllStockInfoQuery(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.page = source["page"];
+	        this.pageSize = source["pageSize"];
+	        this.securityCode = source["securityCode"];
+	        this.securityName = source["securityName"];
+	        this.market = source["market"];
+	        this.industry = source["industry"];
+	        this.concept = source["concept"];
+	        this.minPrice = source["minPrice"];
+	        this.maxPrice = source["maxPrice"];
+	        this.minChange = source["minChange"];
+	        this.maxChange = source["maxChange"];
+	        this.searchKeyWord = source["searchKeyWord"];
+	    }
+	}
 	export class FundBasic {
 	    ID: number;
 	    // Go type: time
@@ -246,6 +376,10 @@ export namespace data {
 	    Cron?: string;
 	    IsDel: number;
 	    Groups: GroupStock[];
+	    AiConfigId: number;
+	    EntryPrice: number;
+	    TakeProfitPrice: number;
+	    StopLossPrice: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new FollowedStock(source);
@@ -267,6 +401,10 @@ export namespace data {
 	        this.Cron = source["Cron"];
 	        this.IsDel = source["IsDel"];
 	        this.Groups = this.convertValues(source["Groups"], GroupStock);
+	        this.AiConfigId = source["AiConfigId"];
+	        this.EntryPrice = source["EntryPrice"];
+	        this.TakeProfitPrice = source["TakeProfitPrice"];
+	        this.StopLossPrice = source["StopLossPrice"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -290,27 +428,7 @@ export namespace data {
 	
 	
 	
-	export class SentimentResult {
-	    Score: number;
-	    Category: number;
-	    PositiveCount: number;
-	    NegativeCount: number;
-	    Description: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new SentimentResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Score = source["Score"];
-	        this.Category = source["Category"];
-	        this.PositiveCount = source["PositiveCount"];
-	        this.NegativeCount = source["NegativeCount"];
-	        this.Description = source["Description"];
-	    }
-	}
-	export class Settings {
+	export class SettingConfig {
 	    ID: number;
 	    // Go type: time
 	    CreatedAt: any;
@@ -325,12 +443,6 @@ export namespace data {
 	    updateBasicInfoOnStart: boolean;
 	    refreshInterval: number;
 	    openAiEnable: boolean;
-	    openAiBaseUrl: string;
-	    openAiApiKey: string;
-	    openAiModelName: string;
-	    openAiMaxTokens: number;
-	    openAiTemperature: number;
-	    openAiApiTimeOut: number;
 	    prompt: string;
 	    checkUpdate: boolean;
 	    questionTemplate: string;
@@ -343,9 +455,18 @@ export namespace data {
 	    browserPoolSize: number;
 	    enableFund: boolean;
 	    enablePushNews: boolean;
+	    enableOnlyPushRedNews: boolean;
+	    sponsorCode: string;
+	    httpProxy: string;
+	    httpProxyEnabled: boolean;
+	    enableAgent: boolean;
+	    qgqpBId: string;
+	    windowWidth: number;
+	    windowHeight: number;
+	    aiConfigs: AIConfig[];
 	
 	    static createFrom(source: any = {}) {
-	        return new Settings(source);
+	        return new SettingConfig(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -361,12 +482,6 @@ export namespace data {
 	        this.updateBasicInfoOnStart = source["updateBasicInfoOnStart"];
 	        this.refreshInterval = source["refreshInterval"];
 	        this.openAiEnable = source["openAiEnable"];
-	        this.openAiBaseUrl = source["openAiBaseUrl"];
-	        this.openAiApiKey = source["openAiApiKey"];
-	        this.openAiModelName = source["openAiModelName"];
-	        this.openAiMaxTokens = source["openAiMaxTokens"];
-	        this.openAiTemperature = source["openAiTemperature"];
-	        this.openAiApiTimeOut = source["openAiApiTimeOut"];
 	        this.prompt = source["prompt"];
 	        this.checkUpdate = source["checkUpdate"];
 	        this.questionTemplate = source["questionTemplate"];
@@ -379,6 +494,15 @@ export namespace data {
 	        this.browserPoolSize = source["browserPoolSize"];
 	        this.enableFund = source["enableFund"];
 	        this.enablePushNews = source["enablePushNews"];
+	        this.enableOnlyPushRedNews = source["enableOnlyPushRedNews"];
+	        this.sponsorCode = source["sponsorCode"];
+	        this.httpProxy = source["httpProxy"];
+	        this.httpProxyEnabled = source["httpProxyEnabled"];
+	        this.enableAgent = source["enableAgent"];
+	        this.qgqpBId = source["qgqpBId"];
+	        this.windowWidth = source["windowWidth"];
+	        this.windowHeight = source["windowHeight"];
+	        this.aiConfigs = this.convertValues(source["aiConfigs"], AIConfig);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -424,6 +548,8 @@ export namespace data {
 	    is_hs: string;
 	    act_name: string;
 	    act_ent_type: string;
+	    bk_name: string;
+	    bk_code: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new StockBasic(source);
@@ -452,6 +578,70 @@ export namespace data {
 	        this.is_hs = source["is_hs"];
 	        this.act_name = source["act_name"];
 	        this.act_ent_type = source["act_ent_type"];
+	        this.bk_name = source["bk_name"];
+	        this.bk_code = source["bk_code"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class StockChangeItem {
+	    time: string;
+	    code: string;
+	    name: string;
+	    market: number;
+	    changeType: number;
+	    typeName: string;
+	    volume: number;
+	    price: number;
+	    changeRate: number;
+	    amount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new StockChangeItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.time = source["time"];
+	        this.code = source["code"];
+	        this.name = source["name"];
+	        this.market = source["market"];
+	        this.changeType = source["changeType"];
+	        this.typeName = source["typeName"];
+	        this.volume = source["volume"];
+	        this.price = source["price"];
+	        this.changeRate = source["changeRate"];
+	        this.amount = source["amount"];
+	    }
+	}
+	export class StockChangesResponse {
+	    totalCount: number;
+	    data: StockChangeItem[];
+	
+	    static createFrom(source: any = {}) {
+	        return new StockChangesResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.totalCount = source["totalCount"];
+	        this.data = this.convertValues(source["data"], StockChangeItem);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -611,6 +801,245 @@ export namespace data {
 		    return a;
 		}
 	}
+	export class TradingRecord {
+	    ID: number;
+	    StockCode: string;
+	    StockName: string;
+	    Direction: string;
+	    Price: number;
+	    Volume: number;
+	    Amount: number;
+	    // Go type: time
+	    TradingTime: any;
+	    Reason: string;
+	    StopLossPrice: number;
+	    TakeProfitPrice: number;
+	    Fee: number;
+	    MarketValue: number;
+	    Mindset: string;
+	    recordedClosePrice: number;
+	    // Go type: time
+	    CreatedAt: any;
+	    // Go type: time
+	    UpdatedAt: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new TradingRecord(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.StockCode = source["StockCode"];
+	        this.StockName = source["StockName"];
+	        this.Direction = source["Direction"];
+	        this.Price = source["Price"];
+	        this.Volume = source["Volume"];
+	        this.Amount = source["Amount"];
+	        this.TradingTime = this.convertValues(source["TradingTime"], null);
+	        this.Reason = source["Reason"];
+	        this.StopLossPrice = source["StopLossPrice"];
+	        this.TakeProfitPrice = source["TakeProfitPrice"];
+	        this.Fee = source["Fee"];
+	        this.MarketValue = source["MarketValue"];
+	        this.Mindset = source["Mindset"];
+	        this.recordedClosePrice = source["recordedClosePrice"];
+	        this.CreatedAt = this.convertValues(source["CreatedAt"], null);
+	        this.UpdatedAt = this.convertValues(source["UpdatedAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class TradingRecordItem {
+	    ID: number;
+	    StockCode: string;
+	    StockName: string;
+	    Direction: string;
+	    Price: number;
+	    Volume: number;
+	    Amount: number;
+	    // Go type: time
+	    TradingTime: any;
+	    Reason: string;
+	    StopLossPrice: number;
+	    TakeProfitPrice: number;
+	    Fee: number;
+	    MarketValue: number;
+	    Mindset: string;
+	    recordedClosePrice: number;
+	    // Go type: time
+	    CreatedAt: any;
+	    // Go type: time
+	    UpdatedAt: any;
+	    closePrice: number;
+	    profitAmount: number;
+	    profitPercent: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TradingRecordItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.StockCode = source["StockCode"];
+	        this.StockName = source["StockName"];
+	        this.Direction = source["Direction"];
+	        this.Price = source["Price"];
+	        this.Volume = source["Volume"];
+	        this.Amount = source["Amount"];
+	        this.TradingTime = this.convertValues(source["TradingTime"], null);
+	        this.Reason = source["Reason"];
+	        this.StopLossPrice = source["StopLossPrice"];
+	        this.TakeProfitPrice = source["TakeProfitPrice"];
+	        this.Fee = source["Fee"];
+	        this.MarketValue = source["MarketValue"];
+	        this.Mindset = source["Mindset"];
+	        this.recordedClosePrice = source["recordedClosePrice"];
+	        this.CreatedAt = this.convertValues(source["CreatedAt"], null);
+	        this.UpdatedAt = this.convertValues(source["UpdatedAt"], null);
+	        this.closePrice = source["closePrice"];
+	        this.profitAmount = source["profitAmount"];
+	        this.profitPercent = source["profitPercent"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class TradingRecordListQuery {
+	    page: number;
+	    pageSize: number;
+	    keyword: string;
+	    direction: string;
+	    startDate: string;
+	    endDate: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TradingRecordListQuery(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.page = source["page"];
+	        this.pageSize = source["pageSize"];
+	        this.keyword = source["keyword"];
+	        this.direction = source["direction"];
+	        this.startDate = source["startDate"];
+	        this.endDate = source["endDate"];
+	    }
+	}
+	export class TradingRecordPageData {
+	    list: TradingRecordItem[];
+	    total: number;
+	    page: number;
+	    pageSize: number;
+	    totalPages: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TradingRecordPageData(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.list = this.convertValues(source["list"], TradingRecordItem);
+	        this.total = source["total"];
+	        this.page = source["page"];
+	        this.pageSize = source["pageSize"];
+	        this.totalPages = source["totalPages"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class TradingRecordStatistics {
+	    totalBuyAmount: number;
+	    totalSellAmount: number;
+	    totalProfit: number;
+	    profitRate: number;
+	    holdingsAmount: number;
+	    currentValue: number;
+	    stockCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TradingRecordStatistics(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.totalBuyAmount = source["totalBuyAmount"];
+	        this.totalSellAmount = source["totalSellAmount"];
+	        this.totalProfit = source["totalProfit"];
+	        this.profitRate = source["profitRate"];
+	        this.holdingsAmount = source["holdingsAmount"];
+	        this.currentValue = source["currentValue"];
+	        this.stockCount = source["stockCount"];
+	    }
+	}
+
+}
+
+export namespace lo {
+	
+	export class Tuple2_string_string_ {
+	    A: string;
+	    B: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Tuple2_string_string_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.A = source["A"];
+	        this.B = source["B"];
+	    }
+	}
 
 }
 
@@ -669,6 +1098,512 @@ export namespace models {
 		    return a;
 		}
 	}
+	export class AIResponseResultPageData {
+	    list: AIResponseResult[];
+	    total: number;
+	    page: number;
+	    pageSize: number;
+	    totalPages: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AIResponseResultPageData(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.list = this.convertValues(source["list"], AIResponseResult);
+	        this.total = source["total"];
+	        this.page = source["page"];
+	        this.pageSize = source["pageSize"];
+	        this.totalPages = source["totalPages"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AIResponseResultQuery {
+	    page: number;
+	    pageSize: number;
+	    chatId: string;
+	    modelName: string;
+	    stockCode: string;
+	    stockName: string;
+	    question: string;
+	    startDate: string;
+	    endDate: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AIResponseResultQuery(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.page = source["page"];
+	        this.pageSize = source["pageSize"];
+	        this.chatId = source["chatId"];
+	        this.modelName = source["modelName"];
+	        this.stockCode = source["stockCode"];
+	        this.stockName = source["stockName"];
+	        this.question = source["question"];
+	        this.startDate = source["startDate"];
+	        this.endDate = source["endDate"];
+	    }
+	}
+	export class AiAssistantMessage {
+	    role: string;
+	    content: string;
+	    reasoning: string;
+	    time: string;
+	    modelName?: string;
+	    toolCalls?: number[];
+	    toolResults?: number[];
+	    timeline?: number[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AiAssistantMessage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.role = source["role"];
+	        this.content = source["content"];
+	        this.reasoning = source["reasoning"];
+	        this.time = source["time"];
+	        this.modelName = source["modelName"];
+	        this.toolCalls = source["toolCalls"];
+	        this.toolResults = source["toolResults"];
+	        this.timeline = source["timeline"];
+	    }
+	}
+	export class AiAssistantSessionResp {
+	    messages: AiAssistantMessage[];
+	    sessionId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AiAssistantSessionResp(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.messages = this.convertValues(source["messages"], AiAssistantMessage);
+	        this.sessionId = source["sessionId"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AiRecommendStocks {
+	    ID: number;
+	    // Go type: time
+	    CreatedAt: any;
+	    // Go type: time
+	    UpdatedAt: any;
+	    // Go type: gorm
+	    DeletedAt: any;
+	    // Go type: time
+	    dataTime?: any;
+	    modelName: string;
+	    rating: string;
+	    stockCode: string;
+	    stockName: string;
+	    bkCode: string;
+	    bkName: string;
+	    stockPrice: string;
+	    stockCurrentPrice: string;
+	    stockCurrentPriceTime: string;
+	    stockClosePrice: string;
+	    stockPrePrice: string;
+	    recommendReason: string;
+	    recommendBuyPrice: string;
+	    recommendBuyPriceMin: number;
+	    recommendBuyPriceMax: number;
+	    recommendStopProfitPrice: string;
+	    recommendStopProfitPriceMin: number;
+	    recommendStopProfitPriceMax: number;
+	    recommendStopLossPrice: string;
+	    riskRemarks: string;
+	    remarks: string;
+	    enableAlert: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AiRecommendStocks(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.CreatedAt = this.convertValues(source["CreatedAt"], null);
+	        this.UpdatedAt = this.convertValues(source["UpdatedAt"], null);
+	        this.DeletedAt = this.convertValues(source["DeletedAt"], null);
+	        this.dataTime = this.convertValues(source["dataTime"], null);
+	        this.modelName = source["modelName"];
+	        this.rating = source["rating"];
+	        this.stockCode = source["stockCode"];
+	        this.stockName = source["stockName"];
+	        this.bkCode = source["bkCode"];
+	        this.bkName = source["bkName"];
+	        this.stockPrice = source["stockPrice"];
+	        this.stockCurrentPrice = source["stockCurrentPrice"];
+	        this.stockCurrentPriceTime = source["stockCurrentPriceTime"];
+	        this.stockClosePrice = source["stockClosePrice"];
+	        this.stockPrePrice = source["stockPrePrice"];
+	        this.recommendReason = source["recommendReason"];
+	        this.recommendBuyPrice = source["recommendBuyPrice"];
+	        this.recommendBuyPriceMin = source["recommendBuyPriceMin"];
+	        this.recommendBuyPriceMax = source["recommendBuyPriceMax"];
+	        this.recommendStopProfitPrice = source["recommendStopProfitPrice"];
+	        this.recommendStopProfitPriceMin = source["recommendStopProfitPriceMin"];
+	        this.recommendStopProfitPriceMax = source["recommendStopProfitPriceMax"];
+	        this.recommendStopLossPrice = source["recommendStopLossPrice"];
+	        this.riskRemarks = source["riskRemarks"];
+	        this.remarks = source["remarks"];
+	        this.enableAlert = source["enableAlert"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AiRecommendStocksPageData {
+	    list: AiRecommendStocks[];
+	    total: number;
+	    page: number;
+	    pageSize: number;
+	    totalPages: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AiRecommendStocksPageData(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.list = this.convertValues(source["list"], AiRecommendStocks);
+	        this.total = source["total"];
+	        this.page = source["page"];
+	        this.pageSize = source["pageSize"];
+	        this.totalPages = source["totalPages"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AiRecommendStocksQuery {
+	    page: number;
+	    pageSize: number;
+	    modelName: string;
+	    stockCode: string;
+	    stockName: string;
+	    bkCode: string;
+	    bkName: string;
+	    startDate: string;
+	    endDate: string;
+	    enableAlert?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AiRecommendStocksQuery(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.page = source["page"];
+	        this.pageSize = source["pageSize"];
+	        this.modelName = source["modelName"];
+	        this.stockCode = source["stockCode"];
+	        this.stockName = source["stockName"];
+	        this.bkCode = source["bkCode"];
+	        this.bkName = source["bkName"];
+	        this.startDate = source["startDate"];
+	        this.endDate = source["endDate"];
+	        this.enableAlert = source["enableAlert"];
+	    }
+	}
+	export class AllStockInfo {
+	    ID: number;
+	    // Go type: time
+	    CreatedAt: any;
+	    // Go type: time
+	    UpdatedAt: any;
+	    // Go type: gorm
+	    DeletedAt: any;
+	    SECUCODE: string;
+	    SECURITY_CODE: string;
+	    SECURITY_NAME_ABBR: string;
+	    NEW_PRICE: string;
+	    CHANGE_RATE: string;
+	    VOLUME_RATIO: string;
+	    HIGH_PRICE: string;
+	    LOW_PRICE: string;
+	    PRE_CLOSE_PRICE: string;
+	    VOLUME: string;
+	    DEAL_AMOUNT: string;
+	    TURNOVERRATE: string;
+	    MARKET: string;
+	    CONCEPT: string;
+	    INDUSTRY: string;
+	    MAX_TRADE_DATE: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AllStockInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.CreatedAt = this.convertValues(source["CreatedAt"], null);
+	        this.UpdatedAt = this.convertValues(source["UpdatedAt"], null);
+	        this.DeletedAt = this.convertValues(source["DeletedAt"], null);
+	        this.SECUCODE = source["SECUCODE"];
+	        this.SECURITY_CODE = source["SECURITY_CODE"];
+	        this.SECURITY_NAME_ABBR = source["SECURITY_NAME_ABBR"];
+	        this.NEW_PRICE = source["NEW_PRICE"];
+	        this.CHANGE_RATE = source["CHANGE_RATE"];
+	        this.VOLUME_RATIO = source["VOLUME_RATIO"];
+	        this.HIGH_PRICE = source["HIGH_PRICE"];
+	        this.LOW_PRICE = source["LOW_PRICE"];
+	        this.PRE_CLOSE_PRICE = source["PRE_CLOSE_PRICE"];
+	        this.VOLUME = source["VOLUME"];
+	        this.DEAL_AMOUNT = source["DEAL_AMOUNT"];
+	        this.TURNOVERRATE = source["TURNOVERRATE"];
+	        this.MARKET = source["MARKET"];
+	        this.CONCEPT = source["CONCEPT"];
+	        this.INDUSTRY = source["INDUSTRY"];
+	        this.MAX_TRADE_DATE = source["MAX_TRADE_DATE"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AllStocksResp {
+	    version: any;
+	    // Go type: struct { Nextpage bool "json:\"nextpage\""; Currentpage int "json:\"currentpage\""; Data []models
+	    result: any;
+	    success: boolean;
+	    message: string;
+	    code: number;
+	    url: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AllStocksResp(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.version = source["version"];
+	        this.result = this.convertValues(source["result"], Object);
+	        this.success = source["success"];
+	        this.message = source["message"];
+	        this.code = source["code"];
+	        this.url = source["url"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CronTask {
+	    id: number;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    updatedAt: any;
+	    name: string;
+	    cronExpr: string;
+	    taskType: string;
+	    target: string;
+	    params: string;
+	    enable: boolean;
+	    // Go type: time
+	    lastRunAt?: any;
+	    // Go type: time
+	    nextRunAt?: any;
+	    runCount: number;
+	    status: string;
+	    description: string;
+	    lastRunResult: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CronTask(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.updatedAt = this.convertValues(source["updatedAt"], null);
+	        this.name = source["name"];
+	        this.cronExpr = source["cronExpr"];
+	        this.taskType = source["taskType"];
+	        this.target = source["target"];
+	        this.params = source["params"];
+	        this.enable = source["enable"];
+	        this.lastRunAt = this.convertValues(source["lastRunAt"], null);
+	        this.nextRunAt = this.convertValues(source["nextRunAt"], null);
+	        this.runCount = source["runCount"];
+	        this.status = source["status"];
+	        this.description = source["description"];
+	        this.lastRunResult = source["lastRunResult"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CronTaskPageResp {
+	    total: number;
+	    data: CronTask[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CronTaskPageResp(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.total = source["total"];
+	        this.data = this.convertValues(source["data"], CronTask);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CronTaskQuery {
+	    page: number;
+	    pageSize: number;
+	    name: string;
+	    taskType: string;
+	    status: string;
+	    enable?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new CronTaskQuery(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.page = source["page"];
+	        this.pageSize = source["pageSize"];
+	        this.name = source["name"];
+	        this.taskType = source["taskType"];
+	        this.status = source["status"];
+	        this.enable = source["enable"];
+	    }
+	}
 	export class Prompt {
 	    ID: number;
 	    name: string;
@@ -687,6 +1622,367 @@ export namespace models {
 	        this.type = source["type"];
 	    }
 	}
+	export class PromptTemplate {
+	    ID: number;
+	    // Go type: time
+	    CreatedAt: any;
+	    // Go type: time
+	    UpdatedAt: any;
+	    name: string;
+	    content: string;
+	    type: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PromptTemplate(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.CreatedAt = this.convertValues(source["CreatedAt"], null);
+	        this.UpdatedAt = this.convertValues(source["UpdatedAt"], null);
+	        this.name = source["name"];
+	        this.content = source["content"];
+	        this.type = source["type"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PromptTemplatePageData {
+	    list: PromptTemplate[];
+	    total: number;
+	    page: number;
+	    pageSize: number;
+	    totalPages: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new PromptTemplatePageData(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.list = this.convertValues(source["list"], PromptTemplate);
+	        this.total = source["total"];
+	        this.page = source["page"];
+	        this.pageSize = source["pageSize"];
+	        this.totalPages = source["totalPages"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PromptTemplateQuery {
+	    page: number;
+	    pageSize: number;
+	    name: string;
+	    type: string;
+	    content: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PromptTemplateQuery(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.page = source["page"];
+	        this.pageSize = source["pageSize"];
+	        this.name = source["name"];
+	        this.type = source["type"];
+	        this.content = source["content"];
+	    }
+	}
+	export class SentimentResult {
+	    Score: number;
+	    Category: number;
+	    PositiveCount: number;
+	    NegativeCount: number;
+	    Description: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SentimentResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Score = source["Score"];
+	        this.Category = source["Category"];
+	        this.PositiveCount = source["PositiveCount"];
+	        this.NegativeCount = source["NegativeCount"];
+	        this.Description = source["Description"];
+	    }
+	}
+	export class StockChangeHistory {
+	    id: number;
+	    changeTime: string;
+	    changeDate: string;
+	    stockCode: string;
+	    stockName: string;
+	    market: number;
+	    changeType: number;
+	    typeName: string;
+	    volume: number;
+	    price: number;
+	    changeRate: number;
+	    amount: number;
+	    // Go type: time
+	    createdAt: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new StockChangeHistory(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.changeTime = source["changeTime"];
+	        this.changeDate = source["changeDate"];
+	        this.stockCode = source["stockCode"];
+	        this.stockName = source["stockName"];
+	        this.market = source["market"];
+	        this.changeType = source["changeType"];
+	        this.typeName = source["typeName"];
+	        this.volume = source["volume"];
+	        this.price = source["price"];
+	        this.changeRate = source["changeRate"];
+	        this.amount = source["amount"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class StockChangeHistoryPageData {
+	    list: StockChangeHistory[];
+	    total: number;
+	    page: number;
+	    pageSize: number;
+	    totalPages: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new StockChangeHistoryPageData(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.list = this.convertValues(source["list"], StockChangeHistory);
+	        this.total = source["total"];
+	        this.page = source["page"];
+	        this.pageSize = source["pageSize"];
+	        this.totalPages = source["totalPages"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class StockChangeHistoryQuery {
+	    stockCode: string;
+	    stockName: string;
+	    changeType: number;
+	    changeTypes: number[];
+	    typeName: string;
+	    startDate: string;
+	    endDate: string;
+	    page: number;
+	    pageSize: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new StockChangeHistoryQuery(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.stockCode = source["stockCode"];
+	        this.stockName = source["stockName"];
+	        this.changeType = source["changeType"];
+	        this.changeTypes = source["changeTypes"];
+	        this.typeName = source["typeName"];
+	        this.startDate = source["startDate"];
+	        this.endDate = source["endDate"];
+	        this.page = source["page"];
+	        this.pageSize = source["pageSize"];
+	    }
+	}
+	export class StockInfo {
+	    SECUCODE: string;
+	    SECURITY_CODE: string;
+	    SECURITY_NAME_ABBR: string;
+	    NEW_PRICE: any;
+	    CHANGE_RATE: any;
+	    VOLUME_RATIO: any;
+	    HIGH_PRICE: any;
+	    LOW_PRICE: any;
+	    PRE_CLOSE_PRICE: any;
+	    VOLUME: any;
+	    DEAL_AMOUNT: any;
+	    TURNOVERRATE: any;
+	    MARKET: string;
+	    CONCEPT: any;
+	    INDUSTRY: string;
+	    MAX_TRADE_DATE: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new StockInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.SECUCODE = source["SECUCODE"];
+	        this.SECURITY_CODE = source["SECURITY_CODE"];
+	        this.SECURITY_NAME_ABBR = source["SECURITY_NAME_ABBR"];
+	        this.NEW_PRICE = source["NEW_PRICE"];
+	        this.CHANGE_RATE = source["CHANGE_RATE"];
+	        this.VOLUME_RATIO = source["VOLUME_RATIO"];
+	        this.HIGH_PRICE = source["HIGH_PRICE"];
+	        this.LOW_PRICE = source["LOW_PRICE"];
+	        this.PRE_CLOSE_PRICE = source["PRE_CLOSE_PRICE"];
+	        this.VOLUME = source["VOLUME"];
+	        this.DEAL_AMOUNT = source["DEAL_AMOUNT"];
+	        this.TURNOVERRATE = source["TURNOVERRATE"];
+	        this.MARKET = source["MARKET"];
+	        this.CONCEPT = source["CONCEPT"];
+	        this.INDUSTRY = source["INDUSTRY"];
+	        this.MAX_TRADE_DATE = source["MAX_TRADE_DATE"];
+	    }
+	}
+	export class TechnicalIndicators {
+	    MACD_GOLDEN_FORK: boolean;
+	    KDJ_GOLDEN_FORK: boolean;
+	    BREAK_THROUGH: boolean;
+	    LOW_FUNDS_INFLOW: boolean;
+	    HIGH_FUNDS_OUTFLOW: boolean;
+	    BREAKUP_MA_5DAYS: boolean;
+	    LONG_AVG_ARRAY: boolean;
+	    SHORT_AVG_ARRAY: boolean;
+	    UPPER_LARGE_VOLUME: boolean;
+	    DOWN_NARROW_VOLUME: boolean;
+	    ONE_DAYANG_LINE: boolean;
+	    TWO_DAYANG_LINES: boolean;
+	    RISE_SUN: boolean;
+	    POWER_FULGUN: boolean;
+	    RESTORE_JUSTICE: boolean;
+	    DOWN_7DAYS: boolean;
+	    UPPER_8DAYS: boolean;
+	    UPPER_9DAYS: boolean;
+	    UPPER_4DAYS: boolean;
+	    HEAVEN_RULE: boolean;
+	    UPSIDE_VOLUME: boolean;
+	    BEARISH_ENGULFING: boolean;
+	    REVERSING_HAMMER: boolean;
+	    SHOOTING_STAR: boolean;
+	    EVENING_STAR: boolean;
+	    FIRST_DAWN: boolean;
+	    PREGNANT: boolean;
+	    BLACK_CLOUD_TOPS: boolean;
+	    MORNING_STAR: boolean;
+	    NARROW_FINISH: boolean;
+	    UPP_DAYS: number;
+	    CONCERN_RANK_7DAYS: number;
+	    UPNDAY: number;
+	    DOWNNDAY: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TechnicalIndicators(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.MACD_GOLDEN_FORK = source["MACD_GOLDEN_FORK"];
+	        this.KDJ_GOLDEN_FORK = source["KDJ_GOLDEN_FORK"];
+	        this.BREAK_THROUGH = source["BREAK_THROUGH"];
+	        this.LOW_FUNDS_INFLOW = source["LOW_FUNDS_INFLOW"];
+	        this.HIGH_FUNDS_OUTFLOW = source["HIGH_FUNDS_OUTFLOW"];
+	        this.BREAKUP_MA_5DAYS = source["BREAKUP_MA_5DAYS"];
+	        this.LONG_AVG_ARRAY = source["LONG_AVG_ARRAY"];
+	        this.SHORT_AVG_ARRAY = source["SHORT_AVG_ARRAY"];
+	        this.UPPER_LARGE_VOLUME = source["UPPER_LARGE_VOLUME"];
+	        this.DOWN_NARROW_VOLUME = source["DOWN_NARROW_VOLUME"];
+	        this.ONE_DAYANG_LINE = source["ONE_DAYANG_LINE"];
+	        this.TWO_DAYANG_LINES = source["TWO_DAYANG_LINES"];
+	        this.RISE_SUN = source["RISE_SUN"];
+	        this.POWER_FULGUN = source["POWER_FULGUN"];
+	        this.RESTORE_JUSTICE = source["RESTORE_JUSTICE"];
+	        this.DOWN_7DAYS = source["DOWN_7DAYS"];
+	        this.UPPER_8DAYS = source["UPPER_8DAYS"];
+	        this.UPPER_9DAYS = source["UPPER_9DAYS"];
+	        this.UPPER_4DAYS = source["UPPER_4DAYS"];
+	        this.HEAVEN_RULE = source["HEAVEN_RULE"];
+	        this.UPSIDE_VOLUME = source["UPSIDE_VOLUME"];
+	        this.BEARISH_ENGULFING = source["BEARISH_ENGULFING"];
+	        this.REVERSING_HAMMER = source["REVERSING_HAMMER"];
+	        this.SHOOTING_STAR = source["SHOOTING_STAR"];
+	        this.EVENING_STAR = source["EVENING_STAR"];
+	        this.FIRST_DAWN = source["FIRST_DAWN"];
+	        this.PREGNANT = source["PREGNANT"];
+	        this.BLACK_CLOUD_TOPS = source["BLACK_CLOUD_TOPS"];
+	        this.MORNING_STAR = source["MORNING_STAR"];
+	        this.NARROW_FINISH = source["NARROW_FINISH"];
+	        this.UPP_DAYS = source["UPP_DAYS"];
+	        this.CONCERN_RANK_7DAYS = source["CONCERN_RANK_7DAYS"];
+	        this.UPNDAY = source["UPNDAY"];
+	        this.DOWNNDAY = source["DOWNNDAY"];
+	    }
+	}
 	export class VersionInfo {
 	    ID: number;
 	    // Go type: time
@@ -700,7 +1996,9 @@ export namespace models {
 	    icon: string;
 	    alipay: string;
 	    wxpay: string;
+	    wxgzh: string;
 	    buildTimeStamp: number;
+	    officialStatement: string;
 	    IsDel: number;
 	
 	    static createFrom(source: any = {}) {
@@ -718,7 +2016,9 @@ export namespace models {
 	        this.icon = source["icon"];
 	        this.alipay = source["alipay"];
 	        this.wxpay = source["wxpay"];
+	        this.wxgzh = source["wxgzh"];
 	        this.buildTimeStamp = source["buildTimeStamp"];
+	        this.officialStatement = source["officialStatement"];
 	        this.IsDel = source["IsDel"];
 	    }
 	

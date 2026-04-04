@@ -4,17 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/duke-git/lancet/v2/convertor"
-	"github.com/duke-git/lancet/v2/random"
-	"github.com/duke-git/lancet/v2/strutil"
-	"github.com/go-resty/resty/v2"
 	"go-stock/backend/db"
 	"go-stock/backend/logger"
+	"go-stock/backend/models"
+	"go-stock/backend/util"
 	"io/ioutil"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/duke-git/lancet/v2/convertor"
+	"github.com/duke-git/lancet/v2/random"
+	"github.com/duke-git/lancet/v2/strutil"
+	"github.com/go-resty/resty/v2"
 )
 
 // @Author spark
@@ -48,13 +51,50 @@ func TestGetFinancialReports(t *testing.T) {
 
 func TestGetTelegraphSearch(t *testing.T) {
 	db.Init("../../data/stock.db")
+	searchWords := "半导体 新能源汽车 机器人"
 	//url := "https://www.cls.cn/searchPage?keyword=%E9%97%BB%E6%B3%B0%E7%A7%91%E6%8A%80&type=telegram"
-	messages := SearchStockInfo("谷歌", "telegram", 30)
+	messages := SearchStockInfo(searchWords, "telegram", 30)
 	for _, message := range *messages {
 		logger.SugaredLogger.Info(message)
 	}
 
 	//https://www.cls.cn/stock?code=sh600745
+}
+func TestCailianpressWeb(t *testing.T) {
+	db.Init("../../data/stock.db")
+	searchWords := ""
+	res := NewMarketNewsApi().CailianpressWeb(searchWords)
+	md := util.MarkdownTableWithTitle(searchWords+"财联社新闻", res.List)
+	logger.SugaredLogger.Info(md)
+}
+func TestGetAllStocks(t *testing.T) {
+	db.Init("../../data/stock.db")
+	db.Dao.AutoMigrate(&models.AllStockInfo{})
+
+	db.Dao.Unscoped().Model(&models.AllStockInfo{}).Where("1=1").Delete(&models.AllStockInfo{})
+	for page := 1; page < 3; page++ {
+		res := NewStockDataApi().GetAllStocks(page, 3000, "", models.TechnicalIndicators{
+			BEARISHENGULFING: true,
+			BLACKCLOUDTOPS:   true,
+		})
+		var datas []models.AllStockInfo
+		for _, data := range (*res).Result.Data {
+			datas = append(datas, data.ToAllStockInfo())
+		}
+		err := db.Dao.CreateInBatches(&datas, 500).Error
+		if err != nil {
+			logger.SugaredLogger.Errorf("db.Dao.CreateInBatches error:%s", err.Error())
+		}
+	}
+}
+func TestFilterStocks(t *testing.T) {
+	db.Init("../../data/stock.db")
+
+	res := NewStockDataApi().GetAllStocks(1, 100, "", models.TechnicalIndicators{
+		CONCERN_RANK_7DAYS: 50,
+	})
+	logger.SugaredLogger.Infof("%+#v", len((*res).Result.Data))
+
 }
 func TestSearchStockInfoByCode(t *testing.T) {
 	db.Init("../../data/stock.db")
@@ -63,7 +103,7 @@ func TestSearchStockInfoByCode(t *testing.T) {
 
 func TestSearchStockPriceInfo(t *testing.T) {
 	db.Init("../../data/stock.db")
-	//SearchStockPriceInfo("中信证券", "hk06030", 30)
+	SearchStockPriceInfo("博安生物", "hk06955", 30)
 	SearchStockPriceInfo("上海贝岭", "sh600171", 30)
 	//SearchStockPriceInfo("苹果公司", "gb_aapl", 30)
 	//SearchStockPriceInfo("微创光电", "bj430198", 30)
@@ -74,7 +114,7 @@ func TestSearchStockPriceInfo(t *testing.T) {
 }
 func TestGetStockMinutePriceData(t *testing.T) {
 	db.Init("../../data/stock.db")
-	data, date := NewStockDataApi().GetStockMinutePriceData("usTSLA.OQ")
+	data, date := NewStockDataApi().GetStockMinutePriceData("sh600171")
 	logger.SugaredLogger.Infof("date:%s", date)
 	logger.SugaredLogger.Infof("%+#v", *data)
 }
@@ -110,9 +150,10 @@ func TestGetHKStockInfo(t *testing.T) {
 	//NewStockDataApi().GetSinaHKStockInfo()
 	//m:105,m:106,m:107  //美股
 	//m:128+t:3,m:128+t:4,m:128+t:1,m:128+t:2 //港股
-	for i := 1; i <= 592; i++ {
-		NewStockDataApi().getDCStockInfo("us", i, 20)
-		time.Sleep(time.Duration(random.RandInt(1, 3)) * time.Second)
+	//274  224 605
+	for i := 197; i <= 274; i++ {
+		NewStockDataApi().getDCStockInfo("", i, 20)
+		time.Sleep(time.Duration(random.RandInt(2, 5)) * time.Second)
 	}
 }
 
@@ -183,7 +224,7 @@ func TestParseFullSingleStockData(t *testing.T) {
 func TestNewStockDataApi(t *testing.T) {
 	db.Init("../../data/stock.db")
 	stockDataApi := NewStockDataApi()
-	datas, _ := stockDataApi.GetStockCodeRealTimeData("sh600859", "sh600745", "gb_tsla", "hk09660", "hk00700")
+	datas, _ := stockDataApi.GetStockCodeRealTimeData("sz002352", "sh600859", "sh600745", "gb_tsla", "hk09660", "hk00700")
 	for _, data := range *datas {
 		t.Log(data)
 	}
@@ -252,4 +293,93 @@ func TestStockDataApi_GetIndexBasic(t *testing.T) {
 	db.Init("../../data/stock.db")
 	stockDataApi := NewStockDataApi()
 	stockDataApi.GetIndexBasic()
+}
+
+func TestName(t *testing.T) {
+	db.Init("../../data/stock.db")
+
+	stockBasics := &[]StockBasic{}
+	resty.New().SetProxy("").R().
+		SetHeader("user", "go-stock").
+		SetResult(stockBasics).
+		Get("http://8.134.249.145:18080/go-stock/stock_basic.json")
+
+	logger.SugaredLogger.Infof("%+v", stockBasics)
+	//db.Dao.Unscoped().Model(&StockBasic{}).Where("1=1").Delete(&StockBasic{})
+	//err := db.Dao.CreateInBatches(stockBasics, 400).Error
+	//if err != nil {
+	//	t.Log(err.Error())
+	//}
+
+}
+func TestGetStockMoneyData(t *testing.T) {
+	db.Init("../../data/stock.db")
+	stockDataApi := NewStockDataApi()
+	res := stockDataApi.GetStockMoneyData()
+	logger.SugaredLogger.Infof("%s", util.MarkdownTableWithTitle("今日个股资金流向Top50", res.Data.Diff))
+}
+
+func TestGetStockConceptInfo(t *testing.T) {
+	db.Init("../../data/stock.db")
+	stockDataApi := NewStockDataApi()
+	res := stockDataApi.GetStockConceptInfo("601138.SH")
+	logger.SugaredLogger.Infof("%s", util.MarkdownTableWithTitle("601138.SH所属概念/板块信息", res.Result.Data))
+
+}
+
+func TestGetStockHistoryMoneyData(t *testing.T) {
+	db.Init("../../data/stock.db")
+	stockDataApi := NewStockDataApi()
+	res := stockDataApi.GetStockHistoryMoneyData("sh601138")
+	logger.SugaredLogger.Infof("%s", util.MarkdownTableWithTitle("601138.SH历史资金流向一览", res))
+
+}
+
+func TestGetIndustryValuation(t *testing.T) {
+	db.Init("../../data/stock.db")
+	stockDataApi := NewStockDataApi()
+	res := stockDataApi.GetIndustryValuation("消费电子")
+	logger.SugaredLogger.Infof("%s", util.MarkdownTableWithTitle(" 消费电子行业估值", res.Result.Data))
+}
+
+func Test11(t *testing.T) {
+	url := "https://www.iwencai.com/customized/chart/get-robot-data"
+	body := `{
+		"source": "Ths_iwencai_Xuangu",
+			"version": "2.0",
+			"query_area": "",
+			"block_list": "",
+			"add_info": "{\"urp\":{\"scene\":1,\"company\":1,\"business\":1},\"contentType\":\"json\",\"searchInfo\":true}",
+			"question": "立讯精密",
+			"perpage": "50",
+			"page": 1,
+			"secondary_intent": "stock",
+			"log_info": "{\"input_type\":\"typewrite\"}",
+			"rsh": ""
+	}`
+	resp, err := resty.New().R().
+		SetHeader("hexin-v", "AwdKLt3GIiwTSKag8Wve7senlrrUDN9ZNeNfTtnUJrC98S2u4dxrPkWw747q").
+		SetHeader("Content-Type", "application/json;charset=UTF-8").
+		//SetHeader("Cookie", "v=AwdKLt3GIiwTSKag8Wve7senlrrUDN9ZNeNfTtnUJrC98S2u4dxrPkWw747q; other_uid=Ths_iwencai_Xuangu_dt6xi9pjkvlje9ogva7vw9v24diwgcr4;").
+		SetHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36").
+		SetBody(body).Post(url)
+	if err != nil {
+		logger.SugaredLogger.Error(err.Error())
+		return
+	}
+	logger.SugaredLogger.Infof("%s", resp.String())
+}
+
+func TestGetStockRZRQInfo(t *testing.T) {
+	db.Init("../../data/stock.db")
+	stockDataApi := NewStockDataApi()
+	res := stockDataApi.GetStockRZRQInfo("SZ001389")
+	logger.SugaredLogger.Infof("%s", util.MarkdownTableWithTitle("SZ001389融资融券信息", res.Result.Data))
+}
+
+func TestGetMutualTop10Deal(t *testing.T) {
+	db.Init("../../data/stock.db")
+	stockDataApi := NewStockDataApi()
+	res := stockDataApi.GetMutualTop10Deal("002", "2026-03-17", 1, 10)
+	logger.SugaredLogger.Infof("%s", util.MarkdownTableWithTitle("SZ000001 mutual top 10 deal", res.Result.Data))
 }
