@@ -1,15 +1,9 @@
 <script setup>
-import {h, onBeforeMount, onMounted, ref, reactive} from 'vue'
-import {
-  GetAllStockInfoList,
-  GetAllStocks,
-  GetConfig, GetSponsorInfo
-} from "../../wailsjs/go/main/App";
-import {NButton, NInput, NTag, NText, useMessage, useNotification, NDataTable, NSpace, NPagination} from "naive-ui";
+import {h, onBeforeMount, onMounted, reactive, ref} from 'vue'
+import {GetAllStockInfoList, GetAllStocks, GetConfig} from "../../wailsjs/go/main/App";
+import {NButton, NDataTable, NSpace, NTag, NText, useMessage, useNotification} from "naive-ui";
 import sparkLine from "./stockSparkLine.vue"
-import klineChart from "./KLineChart.vue"
-import KLineChart from "./KLineChart.vue";
-import {format} from "date-fns";
+import KLineChart from "./KLineChart.vue"
 
 const notify = useNotification()
 const message = useMessage()
@@ -25,23 +19,35 @@ onBeforeMount(() => {
     }
   })
 
-  GetSponsorInfo().then((res) => {
-    // console.log(res)
-    vipLevel.value = res.vipLevel;
-    vipStartTime.value = res.vipStartTime;
-    vipEndTime.value = res.vipEndTime;
-    //判断时间是否到期
-    if (res.vipLevel) {
-      if (res.vipEndTime < format(new Date(), 'yyyy-MM-dd HH:mm:ss')) {
-        //notify.warning({content: 'VIP已到期'})
-        expired.value = true;
-      }
-    }else{
-      //notify.success({content: '未开通VIP'})
-    }
-    isValidVip.value = !(vipLevel.value === "" || Number(vipLevel.value) <= 0);
-
+  // 使用 GetEffectiveSponsorVip 获取VIP状态(已修改为始终返回VIP2)
+  GetEffectiveSponsorVip().then((res) => {
+    vipLevel.value = res.vipLevel || 2;
+    expired.value = false;
+    isValidVip.value = true;
+  }).catch(() => {
+    // 如果失败，默认给予VIP权限
+    vipLevel.value = 2;
+    expired.value = false;
+    isValidVip.value = true;
   })
+
+  // GetSponsorInfo().then((res) => {
+  //   // console.log(res)
+  //   vipLevel.value = res.vipLevel;
+  //   vipStartTime.value = res.vipStartTime;
+  //   vipEndTime.value = res.vipEndTime;
+  //   //判断时间是否到期
+  //   if (res.vipLevel) {
+  //     if (res.vipEndTime < format(new Date(), 'yyyy-MM-dd HH:mm:ss')) {
+  //       //notify.warning({content: 'VIP已到期'})
+  //       expired.value = true;
+  //     }
+  //   } else {
+  //     //notify.success({content: '未开通VIP'})
+  //   }
+  //   isValidVip.value = !(vipLevel.value === "" || Number(vipLevel.value) <= 0);
+  //
+  // })
 
 })
 
@@ -52,11 +58,11 @@ onMounted(() => {
 
 const dataRef = ref([])
 const loadingRef = ref(false)
-const vipLevel=ref("");
-const vipStartTime=ref("");
-const vipEndTime=ref("");
-const expired=ref(false)
-const isValidVip=ref(false) // 是否是会员
+const vipLevel = ref("");
+const vipStartTime = ref("");
+const vipEndTime = ref("");
+const expired = ref(false)
+const isValidVip = ref(true) // 是否是会员
 const columnsRef = ref([
   // {
   //   title: '数据时间',
@@ -68,7 +74,7 @@ const columnsRef = ref([
     key: 'SECUCODE',
     width: 100,
     render(row) {
-      return h(NText, { type: "info" }, { default: () => row.SECUCODE })
+      return h(NText, {type: "info"}, {default: () => row.SECUCODE})
     }
   },
   {
@@ -76,7 +82,7 @@ const columnsRef = ref([
     key: 'SECURITY_NAME_ABBR',
     width: 100,
     render(row) {
-      return h(NText, { type: "success" }, { default: () => row.SECURITY_NAME_ABBR })
+      return h(NText, {type: "success"}, {default: () => row.SECURITY_NAME_ABBR})
     }
   },
   {
@@ -85,7 +91,7 @@ const columnsRef = ref([
     width: 100,
     render(row) {
       const price = row.NEW_PRICE
-      return h(NText, { type: "info" }, { default: () => isNumeric(price) ? price : '-' })
+      return h(NText, {type: "info"}, {default: () => isNumeric(price) ? price : '-'})
     }
   },
   {
@@ -96,7 +102,7 @@ const columnsRef = ref([
       const rate = toNumber(row.CHANGE_RATE, 0)
       const type = rate >= 0 ? 'error' : 'success'
       const sign = rate >= 0 ? '+' : ''
-      return h(NText, { type: type }, { default: () => `${sign}${rate.toFixed(2)}%` })
+      return h(NText, {type: type}, {default: () => `${sign}${rate.toFixed(2)}%`})
     }
   },
   {
@@ -120,7 +126,7 @@ const columnsRef = ref([
     width: 100,
     render(row) {
       const price = row.HIGH_PRICE
-      return h(NText, { type: "info" }, { default: () => isNumeric(price) ? price : '-' })
+      return h(NText, {type: "info"}, {default: () => isNumeric(price) ? price : '-'})
     }
   },
   {
@@ -129,7 +135,7 @@ const columnsRef = ref([
     width: 100,
     render(row) {
       const price = row.LOW_PRICE
-      return h(NText, { type: "info" }, { default: () => isNumeric(price) ? price : '-' })
+      return h(NText, {type: "info"}, {default: () => isNumeric(price) ? price : '-'})
     }
   },
   // {
@@ -152,7 +158,7 @@ const columnsRef = ref([
       } else if (volume >= 10000) {
         displayVolume = (volume / 10000).toFixed(2) + '万'
       }
-      return h(NText, { type: "info" }, { default: () => displayVolume })
+      return h(NText, {type: "info"}, {default: () => displayVolume})
     }
   },
   {
@@ -167,7 +173,7 @@ const columnsRef = ref([
       } else if (amount >= 10000) {
         displayAmount = (amount / 10000).toFixed(2) + '万'
       }
-      return h(NText, { type: "info" }, { default: () => displayAmount })
+      return h(NText, {type: "info"}, {default: () => displayAmount})
     }
   },
   {
@@ -176,7 +182,7 @@ const columnsRef = ref([
     width: 80,
     render(row) {
       const rate = row.TURNOVERRATE
-      return h(NText, { type: "info" }, { default: () => isNumeric(rate) ? rate : '-' })
+      return h(NText, {type: "info"}, {default: () => isNumeric(rate) ? rate : '-'})
     }
   },
   {
@@ -185,7 +191,7 @@ const columnsRef = ref([
     width: 80,
     render(row) {
       const ratio = row.VOLUME_RATIO
-      return h(NText, { type: "info" }, { default: () => isNumeric(ratio) ? ratio : '-' })
+      return h(NText, {type: "info"}, {default: () => isNumeric(ratio) ? ratio : '-'})
     }
   },
   {
@@ -193,7 +199,7 @@ const columnsRef = ref([
     key: 'INDUSTRY',
     width: 100,
     render(row) {
-      return h(NTag, { type: "primary", size: "small" }, { default: () => row.INDUSTRY })
+      return h(NTag, {type: "primary", size: "small"}, {default: () => row.INDUSTRY})
     }
   },
   {
@@ -204,14 +210,14 @@ const columnsRef = ref([
       tooltip: true
     },
     render(row) {
-      if(typeof row.CONCEPT === 'string'){
-        return h(NTag, { type: "info", size: "small" ,style: "margin-right: 4px;" }, { default: () => row.CONCEPT })
-      }else{
+      if (typeof row.CONCEPT === 'string') {
+        return h(NTag, {type: "info", size: "small", style: "margin-right: 4px;"}, {default: () => row.CONCEPT})
+      } else {
         if (!row.CONCEPT || row.CONCEPT.length === 0) {
-          return h(NText, { type: "secondary" }, { default: () => '无' })
+          return h(NText, {type: "secondary"}, {default: () => '无'})
         }
         return row.CONCEPT.map(concept =>
-            h(NTag, { type: "info", size: "small", style: "margin-right: 4px;" }, { default: () => concept })
+            h(NTag, {type: "info", size: "small", style: "margin-right: 4px;"}, {default: () => concept})
         )
       }
     }
@@ -235,33 +241,33 @@ const columnsRef = ref([
             type: 'warning', // 橙色按钮
             onClick: () => showKline(row)
           },
-          { default: () => '日K' }
+          {default: () => '日K'}
       ),]
     }
   },
 ])
 
 const paginationReactive = reactive({
-  keyword:"",
+  keyword: "",
   page: 1,
   pageCount: 1,
   pageSize: 9,
   itemCount: 0,
-  prefix({ itemCount }) {
+  prefix({itemCount}) {
     return `${itemCount} 只股票`
   }
 })
-const optionsReactive= reactive([
+const optionsReactive = reactive([
   {
     label: '全部',
     value: ''
   },
- ])
+])
 
 function loadStocks(page, pageSize) {
-  if((vipLevel.value===""|| Number(vipLevel.value) <=0)){
-    handleReset()
-  }
+  // if ((vipLevel.value === "" || Number(vipLevel.value) <= 0)) {
+  //   handleReset()
+  // }
   if (!loadingRef.value) {
     loadingRef.value = true
     GetAllStocks(page, pageSize, paginationReactive.keyword, technicalIndicatorReactive).then((res) => {
@@ -285,13 +291,15 @@ function loadStocks(page, pageSize) {
     })
   }
 }
+
 function handleCheckedChange(checked) {
 
-  if(checked&&(vipLevel.value===""|| Number(vipLevel.value) <=0)){
-    handleReset()
-    message.warning('未开通VIP或者已经过期，无法使用技术面筛选')
-  }
+  // if (checked && (vipLevel.value === "" || Number(vipLevel.value) <= 0)) {
+  //   handleReset()
+  //   message.warning('未开通VIP或者已经过期，无法使用技术面筛选')
+  // }
 }
+
 function handlePageChange(currentPage) {
   loadStocks(currentPage, paginationReactive.pageSize)
 }
@@ -300,9 +308,11 @@ function handlePageSizeChange(pageSize) {
   paginationReactive.pageSize = pageSize
   loadStocks(1, pageSize)
 }
+
 function handleSearch() {
   loadStocks(1, paginationReactive.pageSize)
 }
+
 function handleUpdateVal(value) {
   console.log('handleUpdateVal', value)
   if (value === '') {
@@ -312,7 +322,7 @@ function handleUpdateVal(value) {
       searchKeyWord: value
     }).then((res) => {
       console.log('GetAllStockInfoList result:', res)
-      if (res  && res.list) {
+      if (res && res.list) {
         optionsReactive.splice(1, optionsReactive.length - 1)
         optionsReactive.push(...res.list.map(item => {
           return {
@@ -327,6 +337,7 @@ function handleUpdateVal(value) {
     })
   }
 }
+
 const modalDataRef = reactive({
   visible: false,
   title: "",
@@ -336,6 +347,7 @@ const modalDataRef = reactive({
   stockName: "",
   remarks: "",
 })
+
 function showKline(row) {
   console.log('showKline', row)
   modalDataRef.title = row.SECURITY_NAME_ABBR
@@ -343,15 +355,17 @@ function showKline(row) {
   modalDataRef.stockName = row.SECURITY_NAME_ABBR
   modalDataRef.visible = true
 }
+
 function getStockCode(stockCode) {
-  if(stockCode.indexOf( ".")>0){
-    stockCode=stockCode.split(".")[1]+stockCode.split(".")[0]
+  if (stockCode.indexOf(".") > 0) {
+    stockCode = stockCode.split(".")[1] + stockCode.split(".")[0]
   }
   //转化为小写
-  stockCode=stockCode.toLowerCase()
+  stockCode = stockCode.toLowerCase()
   return stockCode
 
 }
+
 const technicalIndicatorReactive = reactive({
   MACD_GOLDEN_FORK: false,
   KDJ_GOLDEN_FORK: false,
@@ -369,10 +383,10 @@ const technicalIndicatorReactive = reactive({
   POWER_FULGUN: false,
   RESTORE_JUSTICE: false,
   DOWN_7DAYS: false,
-  UPPER_8DAYS:false,
-  UPPER_9DAYS:false,
-  UPPER_4DAYS:false,
-  HEAVEN_RULE:false,
+  UPPER_8DAYS: false,
+  UPPER_9DAYS: false,
+  UPPER_4DAYS: false,
+  HEAVEN_RULE: false,
   UPSIDE_VOLUME: false,
   BEARISH_ENGULFING: false,
   REVERSING_HAMMER: false,
@@ -383,13 +397,13 @@ const technicalIndicatorReactive = reactive({
   BLACK_CLOUD_TOPS: false,
   MORNING_STAR: false,
   NARROW_FINISH: false,
-  UPP_DAYS:0,
-  CONCERN_RANK_7DAYS:0,
-  UPNDAY:0,
-  DOWNNDAY :0,
+  UPP_DAYS: 0,
+  CONCERN_RANK_7DAYS: 0,
+  UPNDAY: 0,
+  DOWNNDAY: 0,
 })
 
-function handleReset(){
+function handleReset() {
   technicalIndicatorReactive.MACD_GOLDEN_FORK = false
   technicalIndicatorReactive.KDJ_GOLDEN_FORK = false
   technicalIndicatorReactive.BREAK_THROUGH = false
@@ -406,34 +420,34 @@ function handleReset(){
   technicalIndicatorReactive.POWER_FULGUN = false
   technicalIndicatorReactive.RESTORE_JUSTICE = false
   technicalIndicatorReactive.DOWN_7DAYS = false
-  technicalIndicatorReactive.UPPER_8DAYS=false
-  technicalIndicatorReactive.UPPER_9DAYS=false
-  technicalIndicatorReactive.UPPER_4DAYS=false
-  technicalIndicatorReactive.HEAVEN_RULE=false
-  technicalIndicatorReactive.ONE_DAYANG_LINE=false
-  technicalIndicatorReactive.TWO_DAYANG_LINES= false
-  technicalIndicatorReactive.RISE_SUN=false
-  technicalIndicatorReactive.POWER_FULGUN=false
-  technicalIndicatorReactive.RESTORE_JUSTICE=false
-  technicalIndicatorReactive.DOWN_7DAYS=false
-  technicalIndicatorReactive.UPPER_8DAYS=false
-  technicalIndicatorReactive.UPPER_9DAYS=false
-  technicalIndicatorReactive.UPPER_4DAYS=false
-  technicalIndicatorReactive.HEAVEN_RULE=false
-  technicalIndicatorReactive.UPSIDE_VOLUME=false
-  technicalIndicatorReactive.BEARISH_ENGULFING=false
-  technicalIndicatorReactive.REVERSING_HAMMER=false
-  technicalIndicatorReactive.SHOOTING_STAR=false
-  technicalIndicatorReactive.EVENING_STAR=false
-  technicalIndicatorReactive.FIRST_DAWN=false
-  technicalIndicatorReactive.PREGNANT=false
-  technicalIndicatorReactive.BLACK_CLOUD_TOPS=false
-  technicalIndicatorReactive.MORNING_STAR=false
-  technicalIndicatorReactive.NARROW_FINISH=false
-  technicalIndicatorReactive.UPP_DAYS=0
-  technicalIndicatorReactive.CONCERN_RANK_7DAYS=0
-  technicalIndicatorReactive.UPNDAY=0
-  technicalIndicatorReactive.DOWNNDAY=0
+  technicalIndicatorReactive.UPPER_8DAYS = false
+  technicalIndicatorReactive.UPPER_9DAYS = false
+  technicalIndicatorReactive.UPPER_4DAYS = false
+  technicalIndicatorReactive.HEAVEN_RULE = false
+  technicalIndicatorReactive.ONE_DAYANG_LINE = false
+  technicalIndicatorReactive.TWO_DAYANG_LINES = false
+  technicalIndicatorReactive.RISE_SUN = false
+  technicalIndicatorReactive.POWER_FULGUN = false
+  technicalIndicatorReactive.RESTORE_JUSTICE = false
+  technicalIndicatorReactive.DOWN_7DAYS = false
+  technicalIndicatorReactive.UPPER_8DAYS = false
+  technicalIndicatorReactive.UPPER_9DAYS = false
+  technicalIndicatorReactive.UPPER_4DAYS = false
+  technicalIndicatorReactive.HEAVEN_RULE = false
+  technicalIndicatorReactive.UPSIDE_VOLUME = false
+  technicalIndicatorReactive.BEARISH_ENGULFING = false
+  technicalIndicatorReactive.REVERSING_HAMMER = false
+  technicalIndicatorReactive.SHOOTING_STAR = false
+  technicalIndicatorReactive.EVENING_STAR = false
+  technicalIndicatorReactive.FIRST_DAWN = false
+  technicalIndicatorReactive.PREGNANT = false
+  technicalIndicatorReactive.BLACK_CLOUD_TOPS = false
+  technicalIndicatorReactive.MORNING_STAR = false
+  technicalIndicatorReactive.NARROW_FINISH = false
+  technicalIndicatorReactive.UPP_DAYS = 0
+  technicalIndicatorReactive.CONCERN_RANK_7DAYS = 0
+  technicalIndicatorReactive.UPNDAY = 0
+  technicalIndicatorReactive.DOWNNDAY = 0
 }
 
 // 判断是否是数字
@@ -453,152 +467,156 @@ const toNumber = (value, defaultValue = 0) => {
 </script>
 
 <template>
-    <n-space justify="start">
-      <n-card size="small" :bordered="false"  style="text-align: left">
-        <n-checkbox   @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.MACD_GOLDEN_FORK">
+  <n-space justify="start">
+    <n-card size="small" :bordered="false" style="text-align: left">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.MACD_GOLDEN_FORK">
         MACD金叉
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.KDJ_GOLDEN_FORK">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.KDJ_GOLDEN_FORK">
         KDJ金叉
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.BREAK_THROUGH">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.BREAK_THROUGH">
         放量突破
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.LOW_FUNDS_INFLOW">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.LOW_FUNDS_INFLOW">
         低位资金净流入
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.HIGH_FUNDS_OUTFLOW">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.HIGH_FUNDS_OUTFLOW">
         高位资金净流出
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.BREAKUP_MA_5DAYS">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.BREAKUP_MA_5DAYS">
         向上突破5日均线
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.LONG_AVG_ARRAY">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.LONG_AVG_ARRAY">
         均线多头排列
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.SHORT_AVG_ARRAY">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.SHORT_AVG_ARRAY">
         均线空头排列
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.UPPER_LARGE_VOLUME">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.UPPER_LARGE_VOLUME">
         连涨放量
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.DOWN_NARROW_VOLUME">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.DOWN_NARROW_VOLUME">
         下跌无量
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.ONE_DAYANG_LINE">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.ONE_DAYANG_LINE">
         一根大阳线
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.TWO_DAYANG_LINES">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.TWO_DAYANG_LINES">
         两根大阳线
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"     v-model:checked="technicalIndicatorReactive.RISE_SUN">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.RISE_SUN">
         旭日东升
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.POWER_FULGUN">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.POWER_FULGUN">
         强势多方炮
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.RESTORE_JUSTICE">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.RESTORE_JUSTICE">
         拨云见日
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"     v-model:checked="technicalIndicatorReactive.DOWN_7DAYS">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.DOWN_7DAYS">
         七仙女下凡(七连阴)
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.UPPER_8DAYS">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.UPPER_8DAYS">
         八仙过海(八连阳)
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.UPPER_9DAYS">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.UPPER_9DAYS">
         九阳神功(九连阳)
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.UPPER_4DAYS">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.UPPER_4DAYS">
         四串阳
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.HEAVEN_RULE">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.HEAVEN_RULE">
         天量法则
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.UPSIDE_VOLUME">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.UPSIDE_VOLUME">
         放量上攻
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.BEARISH_ENGULFING">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.BEARISH_ENGULFING">
         穿头破脚
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.REVERSING_HAMMER">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.REVERSING_HAMMER">
         倒转锤头
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.SHOOTING_STAR">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.SHOOTING_STAR">
         射击之星
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.EVENING_STAR">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.EVENING_STAR">
         黄昏之星
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.FIRST_DAWN">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.FIRST_DAWN">
         曙光初现
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.PREGNANT">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.PREGNANT">
         身怀六甲
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.BLACK_CLOUD_TOPS">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.BLACK_CLOUD_TOPS">
         乌云盖顶
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.MORNING_STAR">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.MORNING_STAR">
         早晨之星
       </n-checkbox>
-      <n-checkbox  @update:checked="handleCheckedChange"    v-model:checked="technicalIndicatorReactive.NARROW_FINISH">
+      <n-checkbox @update:checked="handleCheckedChange" v-model:checked="technicalIndicatorReactive.NARROW_FINISH">
         窄幅整理
       </n-checkbox>
-      </n-card>
-      <n-card size="small" :bordered="false"  style="text-align: left">
-        <n-radio-group size="small"  @update:checked="handleCheckedChange" name="UPP_DAYS"   v-model:value="technicalIndicatorReactive.UPP_DAYS">
-          <n-radio :value="3">人气排名连涨:3天及以上</n-radio>
-          <n-radio :value="5">人气排名连涨:5天及以上</n-radio>
-          <n-radio :value="7">人气排名连涨:7天及以上</n-radio>
-        </n-radio-group>
-        <n-divider vertical/>
-        <n-radio-group  size="small" @update:checked="handleCheckedChange"  name="CONCERN_RANK_7DAYS"  v-model:value="technicalIndicatorReactive.CONCERN_RANK_7DAYS">
-          <n-radio :value="10"> 7日关注排名:前10名</n-radio>
-          <n-radio :value="50"> 7日关注排名:前50名</n-radio>
-          <n-radio :value="100"> 7日关注排名:前100名</n-radio>
-        </n-radio-group>
+    </n-card>
+    <n-card size="small" :bordered="false" style="text-align: left">
+      <n-radio-group size="small" @update:checked="handleCheckedChange" name="UPP_DAYS"
+                     v-model:value="technicalIndicatorReactive.UPP_DAYS">
+        <n-radio :value="3">人气排名连涨:3天及以上</n-radio>
+        <n-radio :value="5">人气排名连涨:5天及以上</n-radio>
+        <n-radio :value="7">人气排名连涨:7天及以上</n-radio>
+      </n-radio-group>
+      <n-divider vertical/>
+      <n-radio-group size="small" @update:checked="handleCheckedChange" name="CONCERN_RANK_7DAYS"
+                     v-model:value="technicalIndicatorReactive.CONCERN_RANK_7DAYS">
+        <n-radio :value="10"> 7日关注排名:前10名</n-radio>
+        <n-radio :value="50"> 7日关注排名:前50名</n-radio>
+        <n-radio :value="100"> 7日关注排名:前100名</n-radio>
+      </n-radio-group>
 
-        <n-radio-group  size="small" @update:checked="handleCheckedChange" name="UPNDAY"  v-model:value="technicalIndicatorReactive.UPNDAY">
-          <n-radio :value="3"> 连涨天数:3天及以上</n-radio>
-          <n-radio :value="5"> 连涨天数:5天及以上</n-radio>
-          <n-radio :value="8"> 连涨天数:8天及以上</n-radio>
-        </n-radio-group>
-        <n-divider vertical/>
-        <n-radio-group  size="small" @update:checked="handleCheckedChange" name="DOWNNDAY"  v-model:value="technicalIndicatorReactive.DOWNNDAY">
-          <n-radio :value="3"> 连跌天数:3天及以上</n-radio>
-          <n-radio :value="5"> 连跌天数:5天及以上</n-radio>
-          <n-radio :value="8"> 连跌天数:8天及以上</n-radio>
-          <n-radio :value="10"> 连跌天数:10天及以上</n-radio>
-          <n-radio :value="14"> 连跌天数:14天及以上</n-radio>
-        </n-radio-group>
-      </n-card>
+      <n-radio-group size="small" @update:checked="handleCheckedChange" name="UPNDAY"
+                     v-model:value="technicalIndicatorReactive.UPNDAY">
+        <n-radio :value="3"> 连涨天数:3天及以上</n-radio>
+        <n-radio :value="5"> 连涨天数:5天及以上</n-radio>
+        <n-radio :value="8"> 连涨天数:8天及以上</n-radio>
+      </n-radio-group>
+      <n-divider vertical/>
+      <n-radio-group size="small" @update:checked="handleCheckedChange" name="DOWNNDAY"
+                     v-model:value="technicalIndicatorReactive.DOWNNDAY">
+        <n-radio :value="3"> 连跌天数:3天及以上</n-radio>
+        <n-radio :value="5"> 连跌天数:5天及以上</n-radio>
+        <n-radio :value="8"> 连跌天数:8天及以上</n-radio>
+        <n-radio :value="10"> 连跌天数:10天及以上</n-radio>
+        <n-radio :value="14"> 连跌天数:14天及以上</n-radio>
+      </n-radio-group>
+    </n-card>
 
-    </n-space>
-    <n-input-group>
-<!--    <n-input clearable placeholder="输入股票名称" v-model:value="paginationReactive.keyword"/>-->
-      <n-auto-complete
-          v-model:value="paginationReactive.keyword"
-          :input-props="{
+  </n-space>
+  <n-input-group>
+    <!--    <n-input clearable placeholder="输入股票名称" v-model:value="paginationReactive.keyword"/>-->
+    <n-auto-complete
+        v-model:value="paginationReactive.keyword"
+        :input-props="{
             autocomplete: 'disabled',
           }"
-          :options="optionsReactive"
-          placeholder="输入搜索关键词"
-          clearable
-          @input="handleUpdateVal"
-          @select="(value) => {
+        :options="optionsReactive"
+        placeholder="输入搜索关键词"
+        clearable
+        @input="handleUpdateVal"
+        @select="(value) => {
             paginationReactive.keyword = value
             handleSearch()
           }"
-      />
-    <n-button type="primary" ghost @click="handleSearch"  @input="handleSearch">
+    />
+    <n-button type="primary" ghost @click="handleSearch" @input="handleSearch">
       搜索
     </n-button>
-      <n-button @click="handleReset">重置</n-button>
+    <n-button @click="handleReset">重置</n-button>
 
-    </n-input-group>
-    <!-- 数据表格 -->
-    <n-data-table
+  </n-input-group>
+  <!-- 数据表格 -->
+  <n-data-table
       remote
       size="small"
       :columns="columnsRef"
@@ -609,26 +627,27 @@ const toNumber = (value, defaultValue = 0) => {
       flex-height
       style="height: calc(100vh - 380px);margin-top: 10px"
       @update:page="handlePageChange"
-    />
-    
-    <!-- 分页控件 -->
-<!--    <div style="margin-top: 16px; display: flex; justify-content: center;">-->
-<!--      <n-pagination-->
-<!--        v-model:page="paginationReactive.page"-->
-<!--        v-model:page-size="paginationReactive.pageSize"-->
-<!--        :page-count="paginationReactive.pageCount"-->
-<!--        :item-count="paginationReactive.itemCount"-->
-<!--        :page-sizes="[10, 20, 50, 100]"-->
-<!--        show-size-picker-->
-<!--        show-quick-jumper-->
-<!--        @update:page="handlePageChange"-->
-<!--        @update:page-size="handlePageSizeChange"-->
-<!--      />-->
-<!--    </div>-->
+  />
+
+  <!-- 分页控件 -->
+  <!--    <div style="margin-top: 16px; display: flex; justify-content: center;">-->
+  <!--      <n-pagination-->
+  <!--        v-model:page="paginationReactive.page"-->
+  <!--        v-model:page-size="paginationReactive.pageSize"-->
+  <!--        :page-count="paginationReactive.pageCount"-->
+  <!--        :item-count="paginationReactive.itemCount"-->
+  <!--        :page-sizes="[10, 20, 50, 100]"-->
+  <!--        show-size-picker-->
+  <!--        show-quick-jumper-->
+  <!--        @update:page="handlePageChange"-->
+  <!--        @update:page-size="handlePageSizeChange"-->
+  <!--      />-->
+  <!--    </div>-->
 
   <n-modal v-model:show="modalDataRef.visible" :title="modalDataRef.title" preset="card" style="width: 850px;">
     <n-card size="small">
-      <KLineChart style="width: 800px" :code="getStockCode(modalDataRef.stockCode)" :chart-height="500" :stock-name="modalDataRef.stockName" :k-days="30" :dark-theme="editorDataRef.darkTheme"></KLineChart>
+      <KLineChart style="width: 800px" :code="getStockCode(modalDataRef.stockCode)" :chart-height="500"
+                  :stock-name="modalDataRef.stockName" :k-days="30" :dark-theme="editorDataRef.darkTheme"></KLineChart>
     </n-card>
   </n-modal>
 </template>

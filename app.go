@@ -98,50 +98,66 @@ func (a *App) GetSponsorInfo() map[string]any {
 
 // GetEffectiveSponsorVip 从本地配置解密赞助信息并判断当前是否在 VIP 有效期内（与 ai-assistant-web / data.EffectiveSponsorVipLevel 一致）。
 func (a *App) GetEffectiveSponsorVip() map[string]any {
-	level, active := data.EffectiveSponsorVipLevel()
+    // 直接返回VIP2权限，无需验证
 	return map[string]any{
-		"vipLevel": level,
-		"active":   active,
+		"vipLevel": 2,
+		"active":   true,
 	}
+// 	level, active := data.EffectiveSponsorVipLevel()
+// 	return map[string]any{
+// 		"vipLevel": level,
+// 		"active":   active,
+// 	}
 }
 func (a *App) CheckSponsorCode(sponsorCode string) map[string]any {
 	sponsorCode = strutil.Trim(sponsorCode)
 	if sponsorCode != "" {
-		encrypted, err := hex.DecodeString(sponsorCode)
-		if err != nil {
-			return map[string]any{
-				"code": 0,
-				"msg":  "赞助码格式错误,请输入正确的赞助码!",
-			}
-		}
-		key, err := hex.DecodeString(BuildKey)
-		if err != nil {
-			logger.SugaredLogger.Error(err.Error())
-			return map[string]any{
-				"code": 0,
-				"msg":  "版本错误，不支持赞助码!",
-			}
-		}
-		decrypt := cryptor.AesEcbDecrypt(encrypted, key)
-		if decrypt == nil || len(decrypt) == 0 {
-			return map[string]any{
-				"code": 0,
-				"msg":  "赞助码错误，请输入正确的赞助码!",
-			}
-		}
+	    // 任何赞助码都直接通过
+        config := data.GetSettingConfig()
+        if config.SponsorCode != sponsorCode {
+            config.SponsorCode = sponsorCode
+            data.UpdateConfig(config)
+        }
 
-		// 校验通过后，将赞助码持久化到 Settings 中
-		config := data.GetSettingConfig()
-		// 只在赞助码变更时写库，避免无谓更新
-		if config.SponsorCode != sponsorCode {
-			config.SponsorCode = sponsorCode
-			data.UpdateConfig(config)
-		}
-
-		return map[string]any{
-			"code": 1,
-			"msg":  "赞助码校验成功，感谢您的支持!",
-		}
+        return map[string]any{
+            "code": 1,
+            "msg":  "赞助码校验成功，感谢您的支持!",
+        }
+// 		encrypted, err := hex.DecodeString(sponsorCode)
+// 		if err != nil {
+// 			return map[string]any{
+// 				"code": 0,
+// 				"msg":  "赞助码格式错误,请输入正确的赞助码!",
+// 			}
+// 		}
+// 		key, err := hex.DecodeString(BuildKey)
+// 		if err != nil {
+// 			logger.SugaredLogger.Error(err.Error())
+// 			return map[string]any{
+// 				"code": 0,
+// 				"msg":  "版本错误，不支持赞助码!",
+// 			}
+// 		}
+// 		decrypt := cryptor.AesEcbDecrypt(encrypted, key)
+// 		if decrypt == nil || len(decrypt) == 0 {
+// 			return map[string]any{
+// 				"code": 0,
+// 				"msg":  "赞助码错误，请输入正确的赞助码!",
+// 			}
+// 		}
+//
+// 		// 校验通过后，将赞助码持久化到 Settings 中
+// 		config := data.GetSettingConfig()
+// 		// 只在赞助码变更时写库，避免无谓更新
+// 		if config.SponsorCode != sponsorCode {
+// 			config.SponsorCode = sponsorCode
+// 			data.UpdateConfig(config)
+// 		}
+//
+// 		return map[string]any{
+// 			"code": 1,
+// 			"msg":  "赞助码校验成功，感谢您的支持!",
+// 		}
 	} else {
 		return map[string]any{"code": 0, "message": "赞助码不能为空,请输入正确的赞助码!"}
 	}
@@ -269,75 +285,93 @@ func (a *App) CheckUpdate(flag int) {
 }
 
 func (a *App) isVip(sponsorCode string, downloadUrl string, releaseVersion *models.GitHubReleaseVersion) (string, string, bool) {
-	isVip := false
-	vipLevel := "0"
-	sponsorCode = strutil.Trim(a.GetConfig().SponsorCode)
-	if sponsorCode != "" {
-		encrypted, err := hex.DecodeString(sponsorCode)
-		if err != nil {
-			logger.SugaredLogger.Error(err.Error())
-			return "", "0", false
-		}
-		key, err := hex.DecodeString(BuildKey)
-		if err != nil {
-			logger.SugaredLogger.Error(err.Error())
-			return "", "0", false
-		}
-		decrypt := string(cryptor.AesEcbDecrypt(encrypted, key))
-		err = json.Unmarshal([]byte(decrypt), &a.SponsorInfo)
-		if err != nil {
-			logger.SugaredLogger.Error(err.Error())
-			return "", "0", false
-		}
-		vipLevel = a.SponsorInfo["vipLevel"].(string)
-		vipStartTime, err := time.ParseInLocation("2006-01-02 15:04:05", a.SponsorInfo["vipStartTime"].(string), time.Local)
-		vipEndTime, err := time.ParseInLocation("2006-01-02 15:04:05", a.SponsorInfo["vipEndTime"].(string), time.Local)
-		vipAuthTime, err := time.ParseInLocation("2006-01-02 15:04:05", a.SponsorInfo["vipAuthTime"].(string), time.Local)
-		if err != nil {
-			logger.SugaredLogger.Error(err.Error())
-			return "", vipLevel, false
-		}
+    // 直接返回VIP权限，跳过所有验证
+    isVip := true
+    vipLevel := "2"
 
-		if time.Now().After(vipAuthTime) && time.Now().After(vipStartTime) && time.Now().Before(vipEndTime) {
-			isVip = true
-		}
+    // 设置下载链接
+    if IsWindows() {
+        downloadUrl = fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-windows-amd64.exe", releaseVersion.TagName)
+    }
+    if IsMacOS() {
+        downloadUrl = fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-darwin-universal", releaseVersion.TagName)
+    }
+    if IsLinux() {
+        downloadUrl = fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-linux-amd64", releaseVersion.TagName)
+    }
 
-		if IsWindows() {
-			if isVip {
-				if a.SponsorInfo["winDownUrl"] == nil {
-					downloadUrl = fmt.Sprintf("https://gitproxy.click/https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-windows-amd64.exe", releaseVersion.TagName)
-				} else {
-					downloadUrl = a.SponsorInfo["winDownUrl"].(string)
-				}
-			} else {
-				downloadUrl = fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-windows-amd64.exe", releaseVersion.TagName)
-			}
-		}
-		if IsMacOS() {
-			if isVip {
-				if a.SponsorInfo["macDownUrl"] == nil {
-					downloadUrl = fmt.Sprintf("https://gitproxy.click/https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-darwin-universal", releaseVersion.TagName)
-				} else {
-					downloadUrl = a.SponsorInfo["macDownUrl"].(string)
-				}
-			} else {
-				downloadUrl = fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-darwin-universal", releaseVersion.TagName)
-			}
-		}
-		if IsLinux() {
-			if isVip {
-				if a.SponsorInfo["linuxDownUrl"] == nil {
-					downloadUrl = fmt.Sprintf("https://gitproxy.click/https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-linux-amd64", releaseVersion.TagName)
-				} else {
-					downloadUrl = a.SponsorInfo["linuxDownUrl"].(string)
-				}
-			} else {
-				downloadUrl = fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-linux-amd64", releaseVersion.TagName)
-			}
-		}
+    return downloadUrl, vipLevel, isVip
 
-	}
-	return downloadUrl, vipLevel, isVip
+
+// 	isVip := false
+// 	vipLevel := "0"
+// 	sponsorCode = strutil.Trim(a.GetConfig().SponsorCode)
+// 	if sponsorCode != "" {
+// 		encrypted, err := hex.DecodeString(sponsorCode)
+// 		if err != nil {
+// 			logger.SugaredLogger.Error(err.Error())
+// 			return "", "0", false
+// 		}
+// 		key, err := hex.DecodeString(BuildKey)
+// 		if err != nil {
+// 			logger.SugaredLogger.Error(err.Error())
+// 			return "", "0", false
+// 		}
+// 		decrypt := string(cryptor.AesEcbDecrypt(encrypted, key))
+// 		err = json.Unmarshal([]byte(decrypt), &a.SponsorInfo)
+// 		if err != nil {
+// 			logger.SugaredLogger.Error(err.Error())
+// 			return "", "0", false
+// 		}
+// 		vipLevel = a.SponsorInfo["vipLevel"].(string)
+// 		vipStartTime, err := time.ParseInLocation("2006-01-02 15:04:05", a.SponsorInfo["vipStartTime"].(string), time.Local)
+// 		vipEndTime, err := time.ParseInLocation("2006-01-02 15:04:05", a.SponsorInfo["vipEndTime"].(string), time.Local)
+// 		vipAuthTime, err := time.ParseInLocation("2006-01-02 15:04:05", a.SponsorInfo["vipAuthTime"].(string), time.Local)
+// 		if err != nil {
+// 			logger.SugaredLogger.Error(err.Error())
+// 			return "", vipLevel, false
+// 		}
+//
+// 		if time.Now().After(vipAuthTime) && time.Now().After(vipStartTime) && time.Now().Before(vipEndTime) {
+// 			isVip = true
+// 		}
+//
+// 		if IsWindows() {
+// 			if isVip {
+// 				if a.SponsorInfo["winDownUrl"] == nil {
+// 					downloadUrl = fmt.Sprintf("https://gitproxy.click/https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-windows-amd64.exe", releaseVersion.TagName)
+// 				} else {
+// 					downloadUrl = a.SponsorInfo["winDownUrl"].(string)
+// 				}
+// 			} else {
+// 				downloadUrl = fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-windows-amd64.exe", releaseVersion.TagName)
+// 			}
+// 		}
+// 		if IsMacOS() {
+// 			if isVip {
+// 				if a.SponsorInfo["macDownUrl"] == nil {
+// 					downloadUrl = fmt.Sprintf("https://gitproxy.click/https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-darwin-universal", releaseVersion.TagName)
+// 				} else {
+// 					downloadUrl = a.SponsorInfo["macDownUrl"].(string)
+// 				}
+// 			} else {
+// 				downloadUrl = fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-darwin-universal", releaseVersion.TagName)
+// 			}
+// 		}
+// 		if IsLinux() {
+// 			if isVip {
+// 				if a.SponsorInfo["linuxDownUrl"] == nil {
+// 					downloadUrl = fmt.Sprintf("https://gitproxy.click/https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-linux-amd64", releaseVersion.TagName)
+// 				} else {
+// 					downloadUrl = a.SponsorInfo["linuxDownUrl"].(string)
+// 				}
+// 			} else {
+// 				downloadUrl = fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-linux-amd64", releaseVersion.TagName)
+// 			}
+// 		}
+//
+// 	}
+// 	return downloadUrl, vipLevel, isVip
 }
 
 func (a *App) syncNews() {

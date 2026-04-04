@@ -1,48 +1,55 @@
 <script setup>
-import {computed, h, onBeforeMount, onBeforeUnmount, onMounted,onUnmounted, ref,reactive} from 'vue'
+import {computed, h, onBeforeMount, onMounted, reactive, ref} from 'vue'
 import {
+  DeleteAiRecommendStocks,
   GetAiRecommendStocksList,
   GetConfig,
-  GetSponsorInfo,
-  DeleteAiRecommendStocks,
-  UpdateAiRecommendStocksAlert,
-  ShareAnalysis
+  UpdateAiRecommendStocksAlert
 } from "../../wailsjs/go/main/App";
-import {NAvatar, NButton, NEllipsis, NSwitch, NTag, NText, useMessage, useNotification} from "naive-ui";
+import {NButton, NSwitch, NTag, NText, useMessage, useNotification} from "naive-ui";
 import StockLightweightKlineChart from "./StockLightweightKlineChart.vue";
 import sparkLine from "./stockSparkLine.vue"
-import {format} from "date-fns";
 
 const notify = useNotification()
-const vipLevel=ref("");
-const vipStartTime=ref("");
-const vipEndTime=ref("");
-const expired=ref(false)
-const isValidVip=ref(false) // 是否是会员
+const vipLevel = ref("");
+const vipStartTime = ref("");
+const vipEndTime = ref("");
+const expired = ref(false)
+const isValidVip = ref(true) // 是否是会员
 
-onBeforeMount(()=> {
+onBeforeMount(() => {
   GetConfig().then(result => {
     if (result.darkTheme) {
       editorDataRef.darkTheme = true
     }
   })
-
-  GetSponsorInfo().then((res) => {
-   // console.log(res)
-    vipLevel.value = res.vipLevel;
-    vipStartTime.value = res.vipStartTime;
-    vipEndTime.value = res.vipEndTime;
-    //判断时间是否到期
-    if (res.vipLevel) {
-      if (res.vipEndTime < format(new Date(), 'yyyy-MM-dd HH:mm:ss')) {
-        //notify.warning({content: 'VIP已到期'})
-        expired.value = true;
-      }
-    }else{
-      //notify.success({content: '未开通VIP'})
-    }
-    isValidVip.value = !(vipLevel.value === "" || Number(vipLevel.value) <= 0);
+  // 使用 GetEffectiveSponsorVip 获取VIP状态(已修改为始终返回VIP2)
+  GetEffectiveSponsorVip().then((res) => {
+    vipLevel.value = res.vipLevel || 2;
+    expired.value = false;
+    isValidVip.value = true;
+  }).catch(() => {
+    // 如果失败，默认给予VIP权限
+    vipLevel.value = 2;
+    expired.value = false;
+    isValidVip.value = true;
   })
+  // GetSponsorInfo().then((res) => {
+  //   // console.log(res)
+  //   vipLevel.value = res.vipLevel;
+  //   vipStartTime.value = res.vipStartTime;
+  //   vipEndTime.value = res.vipEndTime;
+  //   //判断时间是否到期
+  //   if (res.vipLevel) {
+  //     if (res.vipEndTime < format(new Date(), 'yyyy-MM-dd HH:mm:ss')) {
+  //       //notify.warning({content: 'VIP已到期'})
+  //       expired.value = true;
+  //     }
+  //   } else {
+  //     //notify.success({content: '未开通VIP'})
+  //   }
+  //   isValidVip.value = !(vipLevel.value === "" || Number(vipLevel.value) <= 0);
+  // })
 })
 onMounted(() => {
   query({
@@ -53,7 +60,7 @@ onMounted(() => {
     startDate: paginationReactive.range[0],
     endDate: paginationReactive.range[1]
   }).then((data) => {
-    console.log( data)
+    console.log(data)
     dataRef.value = data.data
     paginationReactive.page = 1
     paginationReactive.pageCount = data.pageCount
@@ -92,14 +99,14 @@ const columnsRef = ref([
     title: '推荐模型',
     key: 'modelName',
     render(row, index) {
-      return h(NText, { type: "info" }, { default: () => row.modelName })
+      return h(NText, {type: "info"}, {default: () => row.modelName})
     }
   },
   {
     title: '评级',
     key: 'rating',
     render(row, index) {
-      return h(NText, { type: "info" }, { default: () => row.rating || '-' })
+      return h(NText, {type: "info"}, {default: () => row.rating || '-'})
     }
   },
   {
@@ -118,7 +125,7 @@ const columnsRef = ref([
     title: '股票名称',
     key: 'stockName',
     render(row, index) {
-      return h(NText, { type: "info" }, { default: () => row.stockName })
+      return h(NText, {type: "info"}, {default: () => row.stockName})
     }
   },
   {
@@ -129,7 +136,14 @@ const columnsRef = ref([
     title: '最新分时',
     key: 'stockCode',
     render(row, index) {
-      return h(sparkLine, { idSuffix:row.ID, stockName: row.stockName, stockCode: row.stockCode, lastPrice: row.stockCurrentPrice, openPrice: row.stockPrePrice, tooltip: true }, )
+      return h(sparkLine, {
+        idSuffix: row.ID,
+        stockName: row.stockName,
+        stockCode: row.stockCode,
+        lastPrice: row.stockCurrentPrice,
+        openPrice: row.stockPrePrice,
+        tooltip: true
+      },)
     }
   },
   {
@@ -138,12 +152,12 @@ const columnsRef = ref([
     minWidth: 120,
     render(row, index) {
 
-      let diff = ((Number(row.stockCurrentPrice) - Number(row.stockPrePrice))/ Number(row.stockPrePrice)*100).toFixed(2)
+      let diff = ((Number(row.stockCurrentPrice) - Number(row.stockPrePrice)) / Number(row.stockPrePrice) * 100).toFixed(2)
 
-      if(Number(row.stockCurrentPrice)< Number(row.stockPrePrice)) {
-        return [h(NText, { type: "success", bordered: false }, { default: () => row.stockCurrentPrice+` |  ${diff}%` })]
+      if (Number(row.stockCurrentPrice) < Number(row.stockPrePrice)) {
+        return [h(NText, {type: "success", bordered: false}, {default: () => row.stockCurrentPrice + ` |  ${diff}%`})]
       } else {
-        return [h(NText, { type: "error" , bordered: false}, { default: () => row.stockCurrentPrice+` |  ${diff}%` })]
+        return [h(NText, {type: "error", bordered: false}, {default: () => row.stockCurrentPrice + ` |  ${diff}%`})]
       }
     }
   },
@@ -151,96 +165,121 @@ const columnsRef = ref([
     title: '推荐时',
     key: 'stockPrice',
     render(row, index) {
+      // if (vipLevel.value === "" || Number(vipLevel.value) <= 0) {
+      //   return h(NText, {type: "info"}, {default: () => row.stockPrice})
+      // }
 
-      if(vipLevel.value===""|| Number(vipLevel.value) <=0){
-        return h(NText, { type: "info" }, { default: () => row.stockPrice })
+      let diff = ((Number(row.stockCurrentPrice) - Number(row.stockPrice)) / Number(row.stockPrice) * 100).toFixed(2)
+      let flagStr = "暂平"
+      let flag = "info"
+      if (Number(row.stockCurrentPrice) > Number(row.stockPrice)) {
+        flagStr = "暂赢 " + diff + "%"
+        flag = "error"
+      } else if (Number(row.stockCurrentPrice) === Number(row.stockPrice)) {
+        flagStr = "暂平"
+        flag = "info"
+      } else {
+        flagStr = "暂亏 " + diff + "%"
+        flag = "success"
       }
 
-      let diff = ((Number(row.stockCurrentPrice) - Number(row.stockPrice))/ Number(row.stockPrice)*100).toFixed(2)
-      let flagStr="暂平"
-      let flag="info"
-      if(Number(row.stockCurrentPrice)>Number(row.stockPrice)) {
-        flagStr="暂赢 "+diff+"%"
-        flag="error"
-      }else if(Number(row.stockCurrentPrice)===Number(row.stockPrice)){
-        flagStr="暂平"
-        flag="info"
-      }else{
-        flagStr="暂亏 "+ diff+"%"
-        flag="success"
-      }
-
-      return [h(NText, { type: "info" }, { default: () => row.stockPrice }),h(NTag, { type: flag,size: "tiny", bordered: false }, { default: () => flagStr })]
+      return [h(NText, {type: "info"}, {default: () => row.stockPrice}), h(NTag, {
+        type: flag,
+        size: "tiny",
+        bordered: false
+      }, {default: () => flagStr})]
     }
   },
   {
     title: '昨收',
     key: 'stockPrePrice',
     render(row, index) {
-      return h(NText, { type: "info" }, { default: () => row.stockPrePrice })
+      return h(NText, {type: "info"}, {default: () => row.stockPrePrice})
     }
   },
   {
     title: '开仓价',
     key: 'recommendBuyPrice',
     render(row, index) {
-      if(vipLevel.value===""|| Number(vipLevel.value) <=0){
-        return h(NText, { type: "info" }, { default: () => row.recommendBuyPrice })
-      }
+      // if (vipLevel.value === "" || Number(vipLevel.value) <= 0) {
+      //   return h(NText, {type: "info"}, {default: () => row.recommendBuyPrice})
+      // }
 
-
-      if(row.recommendBuyPrice.includes("-")){
-        let prices= row.recommendBuyPrice.split("-")
-        if(Number(row.stockCurrentPrice)>=Number(prices[0])&&Number(row.stockCurrentPrice)<=Number(prices[1])){
-          return [h(NText, { type: "success" }, { default: () => row.recommendBuyPrice }),h(NTag, { type: "error", size: "tiny", bordered: false }, { default: () => "Buy" })]
+      if (row.recommendBuyPrice.includes("-")) {
+        let prices = row.recommendBuyPrice.split("-")
+        if (Number(row.stockCurrentPrice) >= Number(prices[0]) && Number(row.stockCurrentPrice) <= Number(prices[1])) {
+          return [h(NText, {type: "success"}, {default: () => row.recommendBuyPrice}), h(NTag, {
+            type: "error",
+            size: "tiny",
+            bordered: false
+          }, {default: () => "Buy"})]
         }
       }
-      if(row.recommendBuyPriceMin&&row.recommendBuyPriceMax&&Number(row.stockCurrentPrice)<Number(row.recommendBuyPriceMax)&&Number(row.stockCurrentPrice)>Number(row.recommendBuyPriceMin)){
-        return [h(NText, { type: "success" }, { default: () => row.recommendBuyPrice }),h(NTag, { type: "error", size: "tiny", bordered: false }, { default: () => "Buy" })]
+      if (row.recommendBuyPriceMin && row.recommendBuyPriceMax && Number(row.stockCurrentPrice) < Number(row.recommendBuyPriceMax) && Number(row.stockCurrentPrice) > Number(row.recommendBuyPriceMin)) {
+        return [h(NText, {type: "success"}, {default: () => row.recommendBuyPrice}), h(NTag, {
+          type: "error",
+          size: "tiny",
+          bordered: false
+        }, {default: () => "Buy"})]
       }
-      return h(NText, { type: "info" }, { default: () => row.recommendBuyPrice })
-
+      return h(NText, {type: "info"}, {default: () => row.recommendBuyPrice})
     }
   },
   {
     title: '止盈价',
     key: 'recommendStopProfitPrice',
     render(row, index) {
-      if(vipLevel.value===""|| Number(vipLevel.value) <=0){
-        return h(NText, { type: "info" }, { default: () => row.recommendStopProfitPrice })
+      if (vipLevel.value === "" || Number(vipLevel.value) <= 0) {
+        return h(NText, {type: "info"}, {default: () => row.recommendStopProfitPrice})
       }
-      if(row.recommendStopProfitPrice.includes("-")){
-        let prices= row.recommendStopProfitPrice.split("-")
-        if(Number(row.stockCurrentPrice)>=Number(prices[0])&&Number(row.stockCurrentPrice)<=Number(prices[1])){
-          return [h(NText, { type: "success" }, { default: () => row.recommendStopProfitPrice }),h(NTag, { type: "error", size: "tiny", bordered: false }, { default: () => "Sell" })]
+      if (row.recommendStopProfitPrice.includes("-")) {
+        let prices = row.recommendStopProfitPrice.split("-")
+        if (Number(row.stockCurrentPrice) >= Number(prices[0]) && Number(row.stockCurrentPrice) <= Number(prices[1])) {
+          return [h(NText, {type: "success"}, {default: () => row.recommendStopProfitPrice}), h(NTag, {
+            type: "error",
+            size: "tiny",
+            bordered: false
+          }, {default: () => "Sell"})]
         }
       }
-      if(row.recommendStopProfitPriceMin&&Number(row.stockCurrentPrice)>row.recommendStopProfitPriceMin){
-        return [h(NText, { type: "success" }, { default: () => row.recommendStopProfitPrice }),h(NTag, { type: "error", size: "tiny", bordered: false }, { default: () => "Sell" })]
+      if (row.recommendStopProfitPriceMin && Number(row.stockCurrentPrice) > row.recommendStopProfitPriceMin) {
+        return [h(NText, {type: "success"}, {default: () => row.recommendStopProfitPrice}), h(NTag, {
+          type: "error",
+          size: "tiny",
+          bordered: false
+        }, {default: () => "Sell"})]
       }
 
-      return h(NText, { type: "info" }, { default: () => row.recommendStopProfitPrice })
+      return h(NText, {type: "info"}, {default: () => row.recommendStopProfitPrice})
     }
   },
   {
     title: '止损价',
     key: 'recommendStopLossPrice',
     render(row, index) {
-      if(vipLevel.value===""|| Number(vipLevel.value) <=0){
-        return h(NText, { type: "info" }, { default: () => row.recommendStopLossPrice })
+      if (vipLevel.value === "" || Number(vipLevel.value) <= 0) {
+        return h(NText, {type: "info"}, {default: () => row.recommendStopLossPrice})
       }
-      if(row.recommendStopLossPrice.includes("-")){
-        let prices= row.recommendStopLossPrice.split("-")
-        if(Number(row.stockCurrentPrice)<=Number(prices[0])){
-          return [h(NText, { type: "success" }, { default: () => row.recommendStopLossPrice }),h(NTag, { type: "error", size: "tiny", bordered: false }, { default: () => "Sell" })]
+      if (row.recommendStopLossPrice.includes("-")) {
+        let prices = row.recommendStopLossPrice.split("-")
+        if (Number(row.stockCurrentPrice) <= Number(prices[0])) {
+          return [h(NText, {type: "success"}, {default: () => row.recommendStopLossPrice}), h(NTag, {
+            type: "error",
+            size: "tiny",
+            bordered: false
+          }, {default: () => "Sell"})]
         }
-      }else{
-        let prices=row.recommendStopLossPrice
-        if(Number(row.stockCurrentPrice)<=Number(prices)){
-          return [h(NText, { type: "success" }, { default: () => row.recommendStopLossPrice }),h(NTag, { type: "error", size: "tiny", bordered: false }, { default: () => "Sell" })]
+      } else {
+        let prices = row.recommendStopLossPrice
+        if (Number(row.stockCurrentPrice) <= Number(prices)) {
+          return [h(NText, {type: "success"}, {default: () => row.recommendStopLossPrice}), h(NTag, {
+            type: "error",
+            size: "tiny",
+            bordered: false
+          }, {default: () => "Sell"})]
         }
       }
-      return h(NText, { type: "info" }, { default: () => row.recommendStopLossPrice })
+      return h(NText, {type: "info"}, {default: () => row.recommendStopLossPrice})
 
     }
   },
@@ -288,9 +327,11 @@ const columnsRef = ref([
             type: 'warning', // 橙色按钮
             onClick: () => showDetail(row)
           },
-          { default: () => '查看' }
-      ),h(NTag, { strong: true,
-        tertiary: true, type: 'error',  onClick: () => deleteAiRecommendStocks(row.ID) }, { default: () => '删除' })]
+          {default: () => '查看'}
+      ), h(NTag, {
+        strong: true,
+        tertiary: true, type: 'error', onClick: () => deleteAiRecommendStocks(row.ID)
+      }, {default: () => '删除'})]
     }
   },
 ])
@@ -305,15 +346,15 @@ const paginationReactive = reactive({
     new Date(new Date().getTime() - 3 * 24 * 60 * 60 * 1000), // 前3天
     new Date() // 当天
   ],
-  prefix({ itemCount }) {
+  prefix({itemCount}) {
     return `${itemCount} 条记录`
   }
 })
 
 const enableAlertOptions = [
-  { label: '全部', value: null },
-  { label: '已开启预警', value: true },
-  { label: '未开启预警', value: false }
+  {label: '全部', value: null},
+  {label: '已开启预警', value: true},
+  {label: '未开启预警', value: false}
 ]
 
 const modalDataRef = reactive({
@@ -349,17 +390,17 @@ function query({
     GetAiRecommendStocksList({
       "page": page,
       "pageSize": pageSize,
-      "modelName":keyword,
-      "stockName":keyword,
-      "stockCode":keyword,
-      "bkName":keyword,
+      "modelName": keyword,
+      "stockName": keyword,
+      "stockCode": keyword,
+      "bkName": keyword,
       "startDate": startDate,
       "endDate": endDate,
       "enableAlert": enableAlert
     }).then((res) => {
-      const pagedData =res.list
+      const pagedData = res.list
       const total = res.total
-      const pageCount =res.totalPages
+      const pageCount = res.totalPages
       resolve({
         pageCount,
         data: pagedData,
@@ -389,6 +430,7 @@ function handlePageChange(currentPage) {
     })
   }
 }
+
 function handleSearch() {
   if (!loadingRef.value) {
     loadingRef.value = true
@@ -409,6 +451,7 @@ function handleSearch() {
     })
   }
 }
+
 function formatDate(dateString) {
   const date = new Date(dateString)
   const year = date.getFullYear()
@@ -420,12 +463,13 @@ function formatDate(dateString) {
   //return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
   return `${year}-${month}-${day}`
 }
+
 function getStockCode(stockCode) {
-  if(stockCode.indexOf( ".")>0){
-    stockCode=stockCode.split(".")[1]+stockCode.split(".")[0]
+  if (stockCode.indexOf(".") > 0) {
+    stockCode = stockCode.split(".")[1] + stockCode.split(".")[0]
   }
   //转化为小写
-  stockCode=stockCode.toLowerCase()
+  stockCode = stockCode.toLowerCase()
   return stockCode
 
 }
@@ -440,10 +484,10 @@ function recommendRangeToSinglePrice(p) {
 }
 
 function showDetail(row) {
-  if(vipLevel.value===""|| Number(vipLevel.value) <=0){
-    notify.warning({content: '未开通VIP或者已经过期'})
-    return
-  }
+  // if (vipLevel.value === "" || Number(vipLevel.value) <= 0) {
+  //   notify.warning({content: '未开通VIP或者已经过期'})
+  //   return
+  // }
   modalDataRef.title = row.stockName
   modalDataRef.content = row.recommendReason
   modalDataRef.riskRemarks = row.riskRemarks
@@ -455,6 +499,7 @@ function showDetail(row) {
   modalDataRef.longStopLossPrice = recommendRangeToSinglePrice(row.recommendStopLossPrice)
   modalDataRef.longTakeProfitPrice = recommendRangeToSinglePrice(row.recommendStopProfitPrice)
 }
+
 function rowProps(row) {
   return {
     style: 'cursor: pointer;',
@@ -463,6 +508,7 @@ function rowProps(row) {
     }
   }
 }
+
 function deleteAiRecommendStocks(id) {
   DeleteAiRecommendStocks(id).then((res) => {
     notify.info({content: res, duration: 2000})
@@ -482,44 +528,47 @@ function toggleAlert(row, newEnableAlert) {
 
 <template>
   <n-input-group>
-    <n-date-picker  v-model:value="paginationReactive.range" type="daterange"   style="width: 40%"/>
-    <n-select v-model:value="paginationReactive.enableAlert" :options="enableAlertOptions" placeholder="预警状态" style="width: 15%" clearable />
+    <n-date-picker v-model:value="paginationReactive.range" type="daterange" style="width: 40%"/>
+    <n-select v-model:value="paginationReactive.enableAlert" :options="enableAlertOptions" placeholder="预警状态"
+              style="width: 15%" clearable/>
     <n-input clearable placeholder="输入关键词搜索" v-model:value="paginationReactive.keyword"/>
-    <n-button type="primary" ghost @click="handleSearch"  @input="handleSearch">
+    <n-button type="primary" ghost @click="handleSearch" @input="handleSearch">
       搜索
     </n-button>
   </n-input-group>
-        <n-data-table
-            remote
-            size="small"
-            :columns="columnsRef"
-            :data="dataRef"
-            :loading="loadingRef"
-            :pagination="paginationReactive"
-            :row-key="(rowData)=>rowData.ID"
-            @update:page="handlePageChange"
-            flex-height
-            style="height: calc(100vh - 210px);margin-top: 10px"
-        />
+  <n-data-table
+      remote
+      size="small"
+      :columns="columnsRef"
+      :data="dataRef"
+      :loading="loadingRef"
+      :pagination="paginationReactive"
+      :row-key="(rowData)=>rowData.ID"
+      @update:page="handlePageChange"
+      flex-height
+      style="height: calc(100vh - 210px);margin-top: 10px"
+  />
 
   <n-modal v-model:show="modalDataRef.visible" :title="modalDataRef.title" preset="card" style="width: 950px;">
-    <n-gradient-text :size="16" type="warning">{{modalDataRef.remarks}}</n-gradient-text>
+    <n-gradient-text :size="16" type="warning">{{ modalDataRef.remarks }}</n-gradient-text>
     <n-card size="small">
       <StockLightweightKlineChart
-        style="width: 1000px"
-        :code="modalDataRef.stockCode"
-        :chart-height="350"
-        :stock-name="modalDataRef.stockName"
-        :dark-theme="editorDataRef.darkTheme"
-        v-model:long-entry-price="modalDataRef.longEntryPrice"
-        v-model:long-stop-loss-price="modalDataRef.longStopLossPrice"
-        v-model:long-take-profit-price="modalDataRef.longTakeProfitPrice"
+          style="width: 1000px"
+          :code="modalDataRef.stockCode"
+          :chart-height="350"
+          :stock-name="modalDataRef.stockName"
+          :dark-theme="editorDataRef.darkTheme"
+          v-model:long-entry-price="modalDataRef.longEntryPrice"
+          v-model:long-stop-loss-price="modalDataRef.longStopLossPrice"
+          v-model:long-take-profit-price="modalDataRef.longTakeProfitPrice"
       />
     </n-card>
     <n-card size="small">
-    <n-text type="info">{{modalDataRef.content}}</n-text>
-    <n-divider><n-gradient-text type="error">风险提示</n-gradient-text></n-divider>
-    <n-text type="error">{{modalDataRef.riskRemarks}}</n-text>
+      <n-text type="info">{{ modalDataRef.content }}</n-text>
+      <n-divider>
+        <n-gradient-text type="error">风险提示</n-gradient-text>
+      </n-divider>
+      <n-text type="error">{{ modalDataRef.riskRemarks }}</n-text>
     </n-card>
   </n-modal>
 </template>
