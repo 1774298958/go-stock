@@ -89,21 +89,31 @@ func (a *app) health(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (a *app) vipStatus(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
+    w.Header().Set("Content-Type", "application/json")
+	// 直接返回VIP2权限
+	response := map[string]any{
+		"ok":       true,
+		"vipLevel": 2,
+		"active":   true,
 	}
-	level, active := data.EffectiveSponsorVipLevel()
-	ok := active && level >= 2
-	payload := map[string]any{
-		"ok":       ok,
-		"vipLevel": level,
-		"active":   active,
-	}
-	if !ok {
-		payload["message"] = vipDeniedMessage(level, active)
-	}
-	writeJSON(w, http.StatusOK, payload)
+	json.NewEncoder(w).Encode(response)
+	return
+
+// 	if r.Method != http.MethodGet {
+// 		w.WriteHeader(http.StatusMethodNotAllowed)
+// 		return
+// 	}
+// 	level, active := data.EffectiveSponsorVipLevel()
+// 	ok := active && level >= 2
+// 	payload := map[string]any{
+// 		"ok":       ok,
+// 		"vipLevel": level,
+// 		"active":   active,
+// 	}
+// 	if !ok {
+// 		payload["message"] = vipDeniedMessage(level, active)
+// 	}
+// 	writeJSON(w, http.StatusOK, payload)
 }
 
 func vipDeniedMessage(level int, active bool) string {
@@ -114,17 +124,19 @@ func vipDeniedMessage(level int, active bool) string {
 }
 
 func requireVip2(w http.ResponseWriter) bool {
-	level, active := data.EffectiveSponsorVipLevel()
-	if active && level >= 2 {
-		return true
-	}
-	writeJSON(w, http.StatusForbidden, map[string]any{
-		"code":     "VIP2_REQUIRED",
-		"message":  vipDeniedMessage(level, active),
-		"vipLevel": level,
-		"active":   active,
-	})
-	return false
+  // 直接允许访问，无需验证
+  return true
+// 	level, active := data.EffectiveSponsorVipLevel()
+// 	if active && level >= 2 {
+// 		return true
+// 	}
+// 	writeJSON(w, http.StatusForbidden, map[string]any{
+// 		"code":     "VIP2_REQUIRED",
+// 		"message":  vipDeniedMessage(level, active),
+// 		"vipLevel": level,
+// 		"active":   active,
+// 	})
+// 	return false
 }
 
 func (a *app) getAIConfigs(w http.ResponseWriter, _ *http.Request) {
