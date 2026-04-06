@@ -795,27 +795,32 @@ function closePanel() {
 }
 
 async function ensureVipInfo() {
-  if (vipLoaded.value || vipLoading.value) return
-  vipLoading.value = true
-  try {
-    const res = await GetSponsorInfo()
-    const lvl = Number(res?.vipLevel ?? 0)
-    vipLevel.value = Number.isNaN(lvl) ? 0 : lvl
-  } catch (_) {
-    vipLevel.value = 0
-  } finally {
-    vipLoaded.value = true
-    vipLoading.value = false
-  }
+  // VIP检查已移除，直接设置为VIP2权限
+  vipLevel.value = 2
+  vipLoaded.value = true
+  vipLoading.value = false
+  // if (vipLoaded.value || vipLoading.value) return
+  // vipLoading.value = true
+  // try {
+  //   const res = await GetSponsorInfo()
+  //   const lvl = Number(res?.vipLevel ?? 0)
+  //   vipLevel.value = Number.isNaN(lvl) ? 0 : lvl
+  // } catch (_) {
+  //   vipLevel.value = 0
+  // } finally {
+  //   vipLoaded.value = true
+  //   vipLoading.value = false
+  // }
 }
 
 async function togglePanel() {
   if (!panelVisible.value) {
-    await ensureVipInfo()
-    if ((vipLevel.value ?? 0) < 2) {
-      message.warning('go-stock AI Agent 助手功能仅对 VIP2 及以上赞助用户开放，请前往关于页面查看赞助方式。')
-      return
-    }
+    // VIP检查已移除，所有用户都可以使用AI助手
+    // await ensureVipInfo()
+    // if ((vipLevel.value ?? 0) < 2) {
+    //   message.warning('go-stock AI Agent 助手功能仅对 VIP2 及以上赞助用户开放，请前往关于页面查看赞助方式。')
+    //   return
+    // }
     openPanel()
   } else {
     closePanel()

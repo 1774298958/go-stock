@@ -8,7 +8,6 @@ import {
   GetAiConfigs,
   GetAIResponseResult,
   GetConfig,
-  GetEffectiveSponsorVip,
   GetFollowList,
   GetGroupList,
   GetPromptTemplates,
@@ -255,7 +254,7 @@ function handleTabDrop(event) {
 
   // 移除所有高亮样式
   const tabs = document.querySelectorAll('.n-tabs-tab');
-  if(!tabs || tabs.length === 0){
+  if (!tabs || tabs.length === 0) {
     return
   }
   tabs.forEach(tab => {
@@ -301,7 +300,7 @@ function handleTabDrop(event) {
 function handleTabDragEnd(event) {
   // 移除所有高亮样式
   const tabs = document.querySelectorAll('.n-tabs-tab')
-  if(!tabs || tabs.length === 0){
+  if (!tabs || tabs.length === 0) {
     return
   }
   tabs.forEach(tab => {
@@ -566,7 +565,7 @@ onMounted(() => {
 // 清理拖拽事件监听器
 function cleanupDraggableTabs() {
   const tabs = document.querySelectorAll('.n-tabs-tab');
-  if(!tabs || tabs.length === 0){
+  if (!tabs || tabs.length === 0) {
     return
   }
   tabs.forEach((tab) => {
@@ -590,7 +589,7 @@ function initDraggableTabs() {
   // 添加拖拽事件监听器到选项卡元素
   setTimeout(() => {
     const tabs = document.querySelectorAll('.n-tabs-tab');
-    if(!tabs || tabs.length === 0){
+    if (!tabs || tabs.length === 0) {
       return
     }
     tabs.forEach((tab, index) => {
@@ -940,11 +939,11 @@ function saveTradingPriceToBackend() {
   const costPrice = Number(currentStockTradingPrice.value.costPrice) || 0
   console.log('[DEBUG saveTradingPriceToBackend] calling SetTradingPrice with:', code, entryPrice, takeProfitPrice, stopLossPrice, costPrice)
   SetTradingPrice(
-    code,
-    entryPrice,
-    takeProfitPrice,
-    stopLossPrice,
-    costPrice
+      code,
+      entryPrice,
+      takeProfitPrice,
+      stopLossPrice,
+      costPrice
   ).then(result => {
     console.log('[DEBUG saveTradingPriceToBackend] SetTradingPrice result:', result)
     if (result === '设置成功') {
@@ -1617,14 +1616,16 @@ function fromEastMoneyCode(emCode) {
 }
 
 async function refreshEffectiveVip() {
-  try {
-    const r = await GetEffectiveSponsorVip()
-    const active = !!r?.active
-    const lvl = Number(r?.vipLevel ?? 0)
-    vipLevel.value = active && !Number.isNaN(lvl) ? lvl : 0
-  } catch (_) {
-    vipLevel.value = 0
-  }
+  // VIP检查已移除，直接设置为VIP2权限
+  vipLevel.value = 2
+  // try {
+  //   const r = await GetEffectiveSponsorVip()
+  //   const active = !!r?.active
+  //   const lvl = Number(r?.vipLevel ?? 0)
+  //   vipLevel.value = active && !Number.isNaN(lvl) ? lvl : 0
+  // } catch (_) {
+  //   vipLevel.value = 0
+  // }
 }
 
 async function showLightweightKline(code, name) {
@@ -1669,22 +1670,23 @@ async function showLightweightKline(code, name) {
     currentStockTradingPrice.value.takeProfitPrice = 0
     currentStockTradingPrice.value.stopLossPrice = 0
   }
-
-  await refreshEffectiveVip()
-  // 检查 VIP 权限：有效期内 VIP2 及以上（与 AI 助手 Web 端校验一致）
-  if (vipLevel.value < 2) {
-    message.warning('多周期 K 线仅限 VIP2 及以上用户使用，您当前权限不足，将在 10 秒后自动关闭')
-    lwKlineCode.value = em
-    lwKlineName.value = name || ''
-    modalShow6.value = true
-    // 10 秒后自动关闭
-    klineAutoCloseTimer.value = setTimeout(() => {
-      modalShow6.value = false
-      message.info('权限不足，多周期 K 线已自动关闭')
-    }, 10000)
-    return
-  }
+  // VIP检查已移除，所有用户都可以使用多周期K线功能
   modalShow6.value = true
+  // await refreshEffectiveVip()
+  // // 检查 VIP 权限：有效期内 VIP2 及以上（与 AI 助手 Web 端校验一致）
+  // if (vipLevel.value < 2) {
+  //   message.warning('多周期 K 线仅限 VIP2 及以上用户使用，您当前权限不足，将在 10 秒后自动关闭')
+  //   lwKlineCode.value = em
+  //   lwKlineName.value = name || ''
+  //   modalShow6.value = true
+  //   // 10 秒后自动关闭
+  //   klineAutoCloseTimer.value = setTimeout(() => {
+  //     modalShow6.value = false
+  //     message.info('权限不足，多周期 K 线已自动关闭')
+  //   }, 10000)
+  //   return
+  // }
+  // modalShow6.value = true
 }
 
 function showK(code, name) {
@@ -1720,14 +1722,14 @@ function updateCostPriceAndVolumeNew(code, price, volume, alarm, formModel) {
       //message.success(result)
     })
   }
-  
+
   // 保存交易价格（开仓价、止盈价、止损价、成本价）
   if (formModel.entryPrice || formModel.takeProfitPrice || formModel.stopLossPrice || formModel.costPrice) {
     SetTradingPrice(code, formModel.entryPrice || 0, formModel.takeProfitPrice || 0, formModel.stopLossPrice || 0, formModel.costPrice || 0).then(result => {
       //message.success(result)
     })
   }
-  
+
   SetCostPriceAndVolume(code, price, volume).then(result => {
     modalShow.value = false
     message.success(result)
@@ -1796,8 +1798,8 @@ function checkPriceLineAlerts(result) {
   const followedStock = followList.value.find(s => {
     const sCode = s.StockCode || ''
     return sCode === code || sCode === 'sh' + code || sCode === 'sz' + code ||
-           sCode === code.replace('sh', '').replace('sz', '') ||
-           (sCode.length > 2 && code.length > 2 && sCode.includes(code.slice(2)))
+        sCode === code.replace('sh', '').replace('sz', '') ||
+        (sCode.length > 2 && code.length > 2 && sCode.includes(code.slice(2)))
   })
 
   if (!followedStock) return
@@ -1873,7 +1875,7 @@ function aiReCheckStock(stock, stockCode) {
   //
 
   //message.info("sysPromptId:"+data.sysPromptId)
-  NewChatStream(stock, stockCode, data.question, data.aiConfigId, data.sysPromptId, enableTools.value,thinkingMode.value)
+  NewChatStream(stock, stockCode, data.question, data.aiConfigId, data.sysPromptId, enableTools.value, thinkingMode.value)
 }
 
 function aiCheckStock(stock, stockCode) {
@@ -2170,7 +2172,7 @@ function AddStockGroupInfo(groupId, code, name) {
 
 function updateTab(name) {
   stocks.value = []
-  const tabId= Number(name)
+  const tabId = Number(name)
   currentGroupId.value = tabId;
   GetFollowList(tabId).then(result => {
     followList.value = result
@@ -2255,7 +2257,8 @@ watch(modalShow6, (newVal) => {
     </template>
   </vue-danmaku>
   <n-tabs type="card" style="--wails-draggable:no-drag" animated addable :data-currentGroupId="currentGroupId"
-          :value="String(currentGroupId)" @add="addTab" @update:value="updateTab" placement="top" @close="(key)=>{delTab(key)}">
+          :value="String(currentGroupId)" @add="addTab" @update:value="updateTab" placement="top"
+          @close="(key)=>{delTab(key)}">
 
     <n-tab-pane closable name="0" :tab="'全部'">
       <n-grid :x-gap="8" :cols="3" :y-gap="8">
@@ -2358,7 +2361,10 @@ watch(modalShow6, (newVal) => {
               <n-flex vertical :size="8">
                 <n-flex justify="center">
                   <n-text :type="'info'">{{ result["日期"] + " " + result["时间"] }}</n-text>
-                  <n-tag size="small" v-if="result.volume>0" :type="result.profitType">{{ result.volume + "股" }}</n-tag>
+                  <n-tag size="small" v-if="result.volume>0" :type="result.profitType">{{
+                      result.volume + "股"
+                    }}
+                  </n-tag>
                   <n-tag size="small" v-if="result.costPrice>0" :type="result.profitType">
                     {{
                       "成本:" + result.costPrice + "*" + result.costVolume + " " + result.profit + "%" + " ( " + result.profitAmount + " ¥ )"
@@ -2512,7 +2518,10 @@ watch(modalShow6, (newVal) => {
               <n-flex vertical :size="8">
                 <n-flex justify="center">
                   <n-text :type="'info'">{{ result["日期"] + " " + result["时间"] }}</n-text>
-                  <n-tag size="small" v-if="result.volume>0" :type="result.profitType">{{ result.volume + "股" }}</n-tag>
+                  <n-tag size="small" v-if="result.volume>0" :type="result.profitType">{{
+                      result.volume + "股"
+                    }}
+                  </n-tag>
                   <n-tag size="small" v-if="result.costPrice>0" :type="result.profitType">
                     {{
                       "成本:" + result.costPrice + "*" + result.costVolume + " " + result.profit + "%" + " ( " + result.profitAmount + " ¥ )"
@@ -2600,7 +2609,8 @@ watch(modalShow6, (newVal) => {
       <n-grid :cols="2" :x-gap="12">
         <n-gi>
           <n-form-item label="股票成本" path="costPrice">
-            <n-input-number v-model:value="formModel.costPrice" min="0" placeholder="请输入股票成本" style="width: 100%">
+            <n-input-number v-model:value="formModel.costPrice" min="0" placeholder="请输入股票成本"
+                            style="width: 100%">
               <template #suffix>
                 {{ formModel.code.indexOf("hk") >= 0 ? "HK$" : "¥" }}
               </template>
@@ -2609,7 +2619,8 @@ watch(modalShow6, (newVal) => {
         </n-gi>
         <n-gi>
           <n-form-item label="股票数量" path="volume">
-            <n-input-number v-model:value="formModel.volume" min="0" step="100" placeholder="请输入股票数量" style="width: 100%">
+            <n-input-number v-model:value="formModel.volume" min="0" step="100" placeholder="请输入股票数量"
+                            style="width: 100%">
               <template #suffix>
                 股
               </template>
@@ -2636,7 +2647,8 @@ watch(modalShow6, (newVal) => {
         </n-gi>
         <n-gi>
           <n-form-item label="开仓价" path="entryPrice">
-            <n-input-number v-model:value="formModel.entryPrice" min="0" step="0.01" placeholder="请输入开仓价" style="width: 100%">
+            <n-input-number v-model:value="formModel.entryPrice" min="0" step="0.01" placeholder="请输入开仓价"
+                            style="width: 100%">
               <template #suffix>
                 {{ formModel.code.indexOf("hk") >= 0 ? "HK$" : "¥" }}
               </template>
@@ -2651,7 +2663,8 @@ watch(modalShow6, (newVal) => {
         </n-gi>
         <n-gi>
           <n-form-item label="止盈价" path="takeProfitPrice">
-            <n-input-number v-model:value="formModel.takeProfitPrice" min="0" step="0.01" placeholder="请输入止盈价" style="width: 100%">
+            <n-input-number v-model:value="formModel.takeProfitPrice" min="0" step="0.01" placeholder="请输入止盈价"
+                            style="width: 100%">
               <template #suffix>
                 {{ formModel.code.indexOf("hk") >= 0 ? "HK$" : "¥" }}
               </template>
@@ -2660,7 +2673,8 @@ watch(modalShow6, (newVal) => {
         </n-gi>
         <n-gi>
           <n-form-item label="止损价" path="stopLossPrice">
-            <n-input-number v-model:value="formModel.stopLossPrice" min="0" step="0.01" placeholder="请输入止损价" style="width: 100%">
+            <n-input-number v-model:value="formModel.stopLossPrice" min="0" step="0.01" placeholder="请输入止损价"
+                            style="width: 100%">
               <template #suffix>
                 {{ formModel.code.indexOf("hk") >= 0 ? "HK$" : "¥" }}
               </template>
@@ -2795,11 +2809,11 @@ watch(modalShow6, (newVal) => {
                  :chart-height="500"></money-trend>
   </n-modal>
   <n-modal
-    v-model:show="modalShow6"
-    :title="(lwKlineName || '') + ' — 多周期K线'"
-    preset="card"
-    style="width: min(1100px, 96vw); max-width: 96vw; box-sizing: border-box"
-    :content-style="{
+      v-model:show="modalShow6"
+      :title="(lwKlineName || '') + ' — 多周期K线'"
+      preset="card"
+      style="width: min(1100px, 96vw); max-width: 96vw; box-sizing: border-box"
+      :content-style="{
       maxHeight: 'min(85vh, 820px)',
       overflowY: 'auto',
       overflowX: 'hidden',
@@ -2808,20 +2822,20 @@ watch(modalShow6, (newVal) => {
     }"
   >
     <stock-lightweight-kline-chart
-      v-if="modalShow6"
-      :key="'lightweight-' + lwKlineCode"
-      :code="lwKlineCode"
-      :stock-name="lwKlineName"
-      :dark-theme="data.darkTheme"
-      :chart-height="500"
-      :long-entry-price="currentStockTradingPrice.entryPrice"
-      :long-stop-loss-price="currentStockTradingPrice.stopLossPrice"
-      :long-take-profit-price="currentStockTradingPrice.takeProfitPrice"
-      :cost-price="currentStockTradingPrice.costPrice"
-      @update:longEntryPrice="handleLongEntryPriceUpdate"
-      @update:longStopLossPrice="handleLongStopLossPriceUpdate"
-      @update:longTakeProfitPrice="handleLongTakeProfitPriceUpdate"
-      @update:costPrice="handleCostPriceUpdate"
+        v-if="modalShow6"
+        :key="'lightweight-' + lwKlineCode"
+        :code="lwKlineCode"
+        :stock-name="lwKlineName"
+        :dark-theme="data.darkTheme"
+        :chart-height="500"
+        :long-entry-price="currentStockTradingPrice.entryPrice"
+        :long-stop-loss-price="currentStockTradingPrice.stopLossPrice"
+        :long-take-profit-price="currentStockTradingPrice.takeProfitPrice"
+        :cost-price="currentStockTradingPrice.costPrice"
+        @update:longEntryPrice="handleLongEntryPriceUpdate"
+        @update:longStopLossPrice="handleLongStopLossPriceUpdate"
+        @update:longTakeProfitPrice="handleLongTakeProfitPriceUpdate"
+        @update:costPrice="handleCostPriceUpdate"
     />
   </n-modal>
 </template>

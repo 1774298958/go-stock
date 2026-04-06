@@ -1,17 +1,18 @@
 <script setup>
-import { h, onMounted, onUnmounted, ref, reactive } from 'vue'
+import {h, onMounted, onUnmounted, reactive, ref} from 'vue'
 import {
   AddTradingRecord,
+  CheckFrequentTrading,
+  DeleteTradingRecord,
+  GetAllStockInfoList,
+  GetConfig,
+  GetStockRealTimePrice,
   GetTradingRecordList,
   GetTradingRecordStatistics,
-  UpdateTradingRecord,
-  DeleteTradingRecord,
-  CheckFrequentTrading,
-  GetAllStockInfoList,
-  GetStockRealTimePrice,
-  GetConfig
+  UpdateTradingRecord
 } from '../../wailsjs/go/main/App'
 import {
+  NAutoComplete,
   NButton,
   NDataTable,
   NDatePicker,
@@ -28,13 +29,10 @@ import {
   NStatistic,
   NTag,
   NText,
-  NAutoComplete,
   useMessage,
   useNotification
 } from 'naive-ui'
-import sparkLine from "./stockSparkLine.vue";
 import StockLightweightKlineChart from "./StockLightweightKlineChart.vue";
-import { GetEffectiveSponsorVip } from '../../wailsjs/go/main/App'
 
 const message = useMessage()
 const notify = useNotification()
@@ -74,9 +72,9 @@ const formData = reactive({
 })
 
 const directionOptions = [
-  { label: '全部', value: '' },
-  { label: '买入', value: '买入' },
-  { label: '卖出', value: '卖出' }
+  {label: '全部', value: ''},
+  {label: '买入', value: '买入'},
+  {label: '卖出', value: '卖出'}
 ]
 
 const stockCodeOptions = reactive([])
@@ -199,7 +197,7 @@ const paginationReactive = reactive({
   keyword: '',
   direction: '',
   range: currentMonthDateRange(),
-  prefix({ itemCount }) {
+  prefix({itemCount}) {
     return `${itemCount} 条记录`
   }
 })
@@ -231,31 +229,40 @@ function toEastMoneyCode(code) {
 }
 
 async function refreshEffectiveVip() {
-  try {
-    const r = await GetEffectiveSponsorVip()
-    const active = !!r?.active
-    const lvl = Number(r?.vipLevel ?? 0)
-    vipLevel.value = active && !Number.isNaN(lvl) ? lvl : 0
-  } catch (_) {
-    vipLevel.value = 0
-  }
+  // VIP检查已移除，直接设置为VIP2权限
+  vipLevel.value = 2
+  // try {
+  //   const r = await GetEffectiveSponsorVip()
+  //   const active = !!r?.active
+  //   const lvl = Number(r?.vipLevel ?? 0)
+  //   vipLevel.value = active && !Number.isNaN(lvl) ? lvl : 0
+  // } catch (_) {
+  //   vipLevel.value = 0
+  // }
 }
 
 function openKlineChart(row) {
-  refreshEffectiveVip().then(() => {
-    if (vipLevel.value < 2) {
-      message.warning('查看K线仅限VIP2及以上用户使用')
-      return
-    }
-    klineStockCode.value = toEastMoneyCode(row.StockCode)
-    klineStockName.value = row.StockName || ''
-    showKlineModal.value = true
-    longStopLossPrice.value = row.StopLossPrice || 0
-    longTakeProfitPrice.value = row.TakeProfitPrice || 0
-    costPrice.value = row.Price || 0
-  })
-}
+  // VIP检查已移除，所有用户都可以查看K线
+  klineStockCode.value = toEastMoneyCode(row.StockCode)
+  klineStockName.value = row.StockName || ''
+  showKlineModal.value = true
+  longStopLossPrice.value = row.StopLossPrice || 0
+  longTakeProfitPrice.value = row.TakeProfitPrice || 0
+  costPrice.value = row.Price || 0
 
+  // refreshEffectiveVip().then(() => {
+  //   if (vipLevel.value < 2) {
+  //     message.warning('查看K线仅限VIP2及以上用户使用')
+  //     return
+  //   }
+  //   klineStockCode.value = toEastMoneyCode(row.StockCode)
+  //   klineStockName.value = row.StockName || ''
+  //   showKlineModal.value = true
+  //   longStopLossPrice.value = row.StopLossPrice || 0
+  //   longTakeProfitPrice.value = row.TakeProfitPrice || 0
+  //   costPrice.value = row.Price || 0
+  // })
+}
 
 
 function formatRowTradingTime(row) {
@@ -283,10 +290,10 @@ function normalizeTradingRecordRow(row) {
   const closePrice = Number(row.closePrice ?? row.ClosePrice ?? 0)
   const profitAmount = Number(row.profitAmount ?? row.ProfitAmount ?? 0)
   const profitPercent = Number(row.profitPercent ?? row.ProfitPercent ?? 0)
-  return { ...row, closePrice, profitAmount, profitPercent }
+  return {...row, closePrice, profitAmount, profitPercent}
 }
 
-function query({ page, pageSize = 12, keyword = '', direction = '', startDate = '', endDate = '' }) {
+function query({page, pageSize = 12, keyword = '', direction = '', startDate = '', endDate = ''}) {
   return new Promise((resolve, reject) => {
     GetTradingRecordList({
       page,
@@ -296,19 +303,19 @@ function query({ page, pageSize = 12, keyword = '', direction = '', startDate = 
       startDate,
       endDate
     })
-      .then((res) => {
-        const raw = res.list ?? []
-        const list = raw.map(normalizeTradingRecordRow)
-        const total = res.total ?? 0
-        const pageCount = res.totalPages ?? 1
-        resolve({
-          pageCount,
-          data: list,
-          total,
-          page
+        .then((res) => {
+          const raw = res.list ?? []
+          const list = raw.map(normalizeTradingRecordRow)
+          const total = res.total ?? 0
+          const pageCount = res.totalPages ?? 1
+          resolve({
+            pageCount,
+            data: list,
+            total,
+            page
+          })
         })
-      })
-      .catch(reject)
+        .catch(reject)
   })
 }
 
@@ -322,12 +329,13 @@ function silentRefreshCurrentPage() {
     startDate: paginationReactive.range ? formatDate(paginationReactive.range[0]) : '',
     endDate: paginationReactive.range ? formatDate(paginationReactive.range[1]) : ''
   })
-    .then((data) => {
-      dataRef.value = data.data
-      paginationReactive.pageCount = data.pageCount
-      paginationReactive.itemCount = data.total
-    })
-    .catch(() => {})
+      .then((data) => {
+        dataRef.value = data.data
+        paginationReactive.pageCount = data.pageCount
+        paginationReactive.itemCount = data.total
+      })
+      .catch(() => {
+      })
   fetchStatistics()
 }
 
@@ -342,17 +350,17 @@ function handlePageChange(currentPage) {
       startDate: paginationReactive.range ? formatDate(paginationReactive.range[0]) : '',
       endDate: paginationReactive.range ? formatDate(paginationReactive.range[1]) : ''
     })
-      .then((data) => {
-        dataRef.value = data.data
-        paginationReactive.page = currentPage
-        paginationReactive.pageCount = data.pageCount
-        paginationReactive.itemCount = data.total
-        loadingRef.value = false
-      })
-      .catch((e) => {
-        message.error(e?.message || '加载交易日志失败')
-        loadingRef.value = false
-      })
+        .then((data) => {
+          dataRef.value = data.data
+          paginationReactive.page = currentPage
+          paginationReactive.pageCount = data.pageCount
+          paginationReactive.itemCount = data.total
+          loadingRef.value = false
+        })
+        .catch((e) => {
+          message.error(e?.message || '加载交易日志失败')
+          loadingRef.value = false
+        })
   }
 }
 
@@ -367,32 +375,32 @@ function handleSearch() {
       startDate: paginationReactive.range ? formatDate(paginationReactive.range[0]) : '',
       endDate: paginationReactive.range ? formatDate(paginationReactive.range[1]) : ''
     })
-      .then((data) => {
-        dataRef.value = data.data
-        paginationReactive.page = 1
-        paginationReactive.pageCount = data.pageCount
-        paginationReactive.itemCount = data.total
-        loadingRef.value = false
-      })
-      .catch((e) => {
-        message.error(e?.message || '加载交易日志失败')
-        loadingRef.value = false
-      })
+        .then((data) => {
+          dataRef.value = data.data
+          paginationReactive.page = 1
+          paginationReactive.pageCount = data.pageCount
+          paginationReactive.itemCount = data.total
+          loadingRef.value = false
+        })
+        .catch((e) => {
+          message.error(e?.message || '加载交易日志失败')
+          loadingRef.value = false
+        })
   }
   fetchStatistics()
 }
 
 function fetchStatistics() {
   GetTradingRecordStatistics()
-    .then((res) => {
-      console.log('统计数据返回:', res)
-      if (res) {
-        statisticsRef.value = res
-      }
-    })
-    .catch((e) => {
-      console.error('获取统计数据失败:', e)
-    })
+      .then((res) => {
+        console.log('统计数据返回:', res)
+        if (res) {
+          statisticsRef.value = res
+        }
+      })
+      .catch((e) => {
+        console.error('获取统计数据失败:', e)
+      })
 }
 
 function resetFilter() {
@@ -435,32 +443,32 @@ function handleAdd() {
       ...formData,
       TradingTime: new Date(formData.TradingTime)
     })
-      .then(() => {
-        message.success('添加交易日志成功')
-        showAddModal.value = false
-        handleSearch()
-      })
-      .catch((e) => {
-        message.error(e?.message || '添加交易日志失败')
-      })
+        .then(() => {
+          message.success('添加交易日志成功')
+          showAddModal.value = false
+          handleSearch()
+        })
+        .catch((e) => {
+          message.error(e?.message || '添加交易日志失败')
+        })
   }
 
   if (formData.Direction === '买入' && formData.StockCode) {
     CheckFrequentTrading(formData.StockCode)
-      .then((res) => {
-        console.log('检查频繁交易结果:', res)
-        const canTrade = res.canTrade
-        const msg = res.msg
-        if (!canTrade) {
-          message.warning(msg)
-          return
-        }
-        run()
-      })
-      .catch((e) => {
-        console.error('检查频繁交易失败:', e)
-        run()
-      })
+        .then((res) => {
+          console.log('检查频繁交易结果:', res)
+          const canTrade = res.canTrade
+          const msg = res.msg
+          if (!canTrade) {
+            message.warning(msg)
+            return
+          }
+          run()
+        })
+        .catch((e) => {
+          console.error('检查频繁交易失败:', e)
+          run()
+        })
   } else {
     run()
   }
@@ -472,25 +480,25 @@ function handleUpdate() {
     ...formData,
     TradingTime: new Date(formData.TradingTime)
   })
-    .then(() => {
-      message.success('更新交易日志成功')
-      showEditModal.value = false
-      handleSearch()
-    })
-    .catch((e) => {
-      message.error(e?.message || '更新交易日志失败')
-    })
+      .then(() => {
+        message.success('更新交易日志成功')
+        showEditModal.value = false
+        handleSearch()
+      })
+      .catch((e) => {
+        message.error(e?.message || '更新交易日志失败')
+      })
 }
 
 function deleteTradingRecord(id) {
   DeleteTradingRecord(id)
-    .then(() => {
-      notify.info({ content: '删除成功', duration: 2000 })
-      handleSearch()
-    })
-    .catch((e) => {
-      message.error(e?.message || '删除交易日志失败')
-    })
+      .then(() => {
+        notify.info({content: '删除成功', duration: 2000})
+        handleSearch()
+      })
+      .catch((e) => {
+        message.error(e?.message || '删除交易日志失败')
+      })
 }
 
 const columnsRef = ref([
@@ -498,14 +506,14 @@ const columnsRef = ref([
     title: '股票代码',
     key: 'StockCode',
     render(row) {
-      return h(NText, { type: 'info' }, { default: () => row.StockCode })
+      return h(NText, {type: 'info'}, {default: () => row.StockCode})
     }
   },
   {
     title: '股票名称',
     key: 'StockName',
     render(row) {
-      return h(NText, { type: 'info' }, { default: () => row.StockName })
+      return h(NText, {type: 'info'}, {default: () => row.StockName})
     }
   },
   {
@@ -514,9 +522,9 @@ const columnsRef = ref([
     width: 80,
     render(row) {
       return h(
-        NTag,
-        { type: row.Direction === '买入' ? 'error' : 'success', size: 'small', round: true, bordered: false },
-        { default: () => row.Direction }
+          NTag,
+          {type: row.Direction === '买入' ? 'error' : 'success', size: 'small', round: true, bordered: false},
+          {default: () => row.Direction}
       )
     }
   },
@@ -525,7 +533,7 @@ const columnsRef = ref([
     key: 'Price',
     width: 100,
     render(row) {
-      return h(NText, { type: 'info' }, { default: () => formatAmount(row.Price) })
+      return h(NText, {type: 'info'}, {default: () => formatAmount(row.Price)})
     }
   },
   {
@@ -533,7 +541,7 @@ const columnsRef = ref([
     key: 'Volume',
     width: 100,
     render(row) {
-      return h(NText, { type: 'info' }, { default: () => String(row.Volume) })
+      return h(NText, {type: 'info'}, {default: () => String(row.Volume)})
     }
   },
   {
@@ -541,7 +549,7 @@ const columnsRef = ref([
     key: 'Amount',
     width: 120,
     render(row) {
-      return h(NText, { type: 'info' }, { default: () => formatAmount(row.Amount) })
+      return h(NText, {type: 'info'}, {default: () => formatAmount(row.Amount)})
     }
   },
   {
@@ -549,7 +557,7 @@ const columnsRef = ref([
     key: 'closePrice',
     width: 100,
     render(row) {
-      return h(NText, { type: 'info' }, { default: () => formatAmount(row.closePrice) })
+      return h(NText, {type: 'info'}, {default: () => formatAmount(row.closePrice)})
     }
   },
   {
@@ -558,7 +566,7 @@ const columnsRef = ref([
     width: 100,
     render(row) {
       const color = row.profitAmount > 0 ? 'error' : row.profitAmount < 0 ? 'success' : 'info'
-      return h(NText, { type: color }, { default: () => formatAmount(row.profitAmount) })
+      return h(NText, {type: color}, {default: () => formatAmount(row.profitAmount)})
     }
   },
   {
@@ -568,7 +576,7 @@ const columnsRef = ref([
     render(row) {
       const color = row.profitPercent > 0 ? 'error' : row.profitPercent < 0 ? 'success' : 'info'
       const prefix = row.profitPercent > 0 ? '+' : ''
-      return h(NText, { type: color }, { default: () => prefix + row.profitPercent?.toFixed(2) + '%' })
+      return h(NText, {type: color}, {default: () => prefix + row.profitPercent?.toFixed(2) + '%'})
     }
   },
   {
@@ -584,7 +592,7 @@ const columnsRef = ref([
     key: 'StopLossPrice',
     width: 100,
     render(row) {
-      return h(NText, { type: 'info' }, {
+      return h(NText, {type: 'info'}, {
         default: () => (row.StopLossPrice > 0 ? formatAmount(row.StopLossPrice) : '-')
       })
     }
@@ -594,7 +602,7 @@ const columnsRef = ref([
     key: 'TakeProfitPrice',
     width: 100,
     render(row) {
-      return h(NText, { type: 'info' }, {
+      return h(NText, {type: 'info'}, {
         default: () => (row.TakeProfitPrice > 0 ? formatAmount(row.TakeProfitPrice) : '-')
       })
     }
@@ -602,7 +610,7 @@ const columnsRef = ref([
   {
     title: '交易理由',
     key: 'Reason',
-    ellipsis: { tooltip: true }
+    ellipsis: {tooltip: true}
   },
   {
     title: '操作',
@@ -610,34 +618,34 @@ const columnsRef = ref([
     render(row) {
       return [
         h(
-          NTag,
-          {
-            strong: true,
-            tertiary: true,
-            type: 'info',
-            onClick: () => openKlineChart(row)
-          },
-          { default: () => 'K线' }
+            NTag,
+            {
+              strong: true,
+              tertiary: true,
+              type: 'info',
+              onClick: () => openKlineChart(row)
+            },
+            {default: () => 'K线'}
         ),
         h(
-          NTag,
-          {
-            strong: true,
-            tertiary: true,
-            type: 'warning',
-            onClick: () => openEditModal(row)
-          },
-          { default: () => '编辑' }
+            NTag,
+            {
+              strong: true,
+              tertiary: true,
+              type: 'warning',
+              onClick: () => openEditModal(row)
+            },
+            {default: () => '编辑'}
         ),
         h(
-          NTag,
-          {
-            strong: true,
-            tertiary: true,
-            type: 'error',
-            onClick: () => deleteTradingRecord(row.ID)
-          },
-          { default: () => '删除' }
+            NTag,
+            {
+              strong: true,
+              tertiary: true,
+              type: 'error',
+              onClick: () => deleteTradingRecord(row.ID)
+            },
+            {default: () => '删除'}
         )
       ]
     }
@@ -661,17 +669,17 @@ onMounted(() => {
     startDate: paginationReactive.range ? formatDate(paginationReactive.range[0]) : '',
     endDate: paginationReactive.range ? formatDate(paginationReactive.range[1]) : ''
   })
-    .then((data) => {
-      dataRef.value = data.data
-      paginationReactive.page = 1
-      paginationReactive.pageCount = data.pageCount
-      paginationReactive.itemCount = data.total
-      loadingRef.value = false
-    })
-    .catch((e) => {
-      message.error(e?.message || '加载交易日志失败')
-      loadingRef.value = false
-    })
+      .then((data) => {
+        dataRef.value = data.data
+        paginationReactive.page = 1
+        paginationReactive.pageCount = data.pageCount
+        paginationReactive.itemCount = data.total
+        loadingRef.value = false
+      })
+      .catch((e) => {
+        message.error(e?.message || '加载交易日志失败')
+        loadingRef.value = false
+      })
   fetchStatistics()
   // 定时刷新收盘/最新价与盈亏：不抢 loading，避免请求进行中时跳过后续刷新
   refreshTimer.value = setInterval(() => {
@@ -689,15 +697,15 @@ onUnmounted(() => {
 
 <template>
   <n-input-group>
-    <n-date-picker v-model:value="paginationReactive.range" type="daterange" style="width: 40%" />
+    <n-date-picker v-model:value="paginationReactive.range" type="daterange" style="width: 40%"/>
     <n-select
-      v-model:value="paginationReactive.direction"
-      :options="directionOptions"
-      placeholder="交易方向"
-      style="width: 15%"
-      clearable
+        v-model:value="paginationReactive.direction"
+        :options="directionOptions"
+        placeholder="交易方向"
+        style="width: 15%"
+        clearable
     />
-    <n-input clearable placeholder="股票代码 / 名称" v-model:value="paginationReactive.keyword" />
+    <n-input clearable placeholder="股票代码 / 名称" v-model:value="paginationReactive.keyword"/>
     <n-button type="primary" ghost @click="handleSearch">搜索</n-button>
     <n-button @click="resetFilter">重置</n-button>
     <n-button type="primary" ghost @click="openAddModal">添加记录</n-button>
@@ -706,28 +714,28 @@ onUnmounted(() => {
   <n-grid :cols="6" :x-gap="12" style="margin-top: 12px; padding: 12px; border-radius: 4px">
     <n-grid-item>
       <n-statistic label="持仓金额(元)">
-        <n-number-animation :from="0" :to="statisticsRef?.holdingsAmount || 0" :precision="2" />
+        <n-number-animation :from="0" :to="statisticsRef?.holdingsAmount || 0" :precision="2"/>
       </n-statistic>
     </n-grid-item>
     <n-grid-item>
       <n-statistic label="持仓市值(元)">
-        <n-number-animation :from="0" :to="statisticsRef?.currentValue || 0" :precision="2" />
+        <n-number-animation :from="0" :to="statisticsRef?.currentValue || 0" :precision="2"/>
       </n-statistic>
     </n-grid-item>
     <n-grid-item>
       <n-statistic label="总买入(元)">
-        <n-number-animation :from="0" :to="statisticsRef?.totalBuyAmount || 0" :precision="2" />
+        <n-number-animation :from="0" :to="statisticsRef?.totalBuyAmount || 0" :precision="2"/>
       </n-statistic>
     </n-grid-item>
     <n-grid-item>
       <n-statistic label="总卖出(元)">
-        <n-number-animation :from="0" :to="statisticsRef?.totalSellAmount || 0" :precision="2" />
+        <n-number-animation :from="0" :to="statisticsRef?.totalSellAmount || 0" :precision="2"/>
       </n-statistic>
     </n-grid-item>
     <n-grid-item>
       <n-statistic label="总收益(元)">
         <n-text :type="statisticsRef?.totalProfit > 0 ? 'error' : 'success'">
-          <n-number-animation :from="0" :to="statisticsRef?.totalProfit || 0" :precision="2"  />
+          <n-number-animation :from="0" :to="statisticsRef?.totalProfit || 0" :precision="2"/>
         </n-text>
       </n-statistic>
     </n-grid-item>
@@ -735,7 +743,8 @@ onUnmounted(() => {
 
       <n-statistic label="收益率">
         <n-text :type="statisticsRef?.profitRate > 0 ? 'error' : 'success'">
-          <n-number-animation :from="0" :to="statisticsRef?.profitRate || 0" :precision="2"  />%
+          <n-number-animation :from="0" :to="statisticsRef?.profitRate || 0" :precision="2"/>
+          %
         </n-text>
       </n-statistic>
 
@@ -743,16 +752,16 @@ onUnmounted(() => {
   </n-grid>
 
   <n-data-table
-    remote
-    size="small"
-    :columns="columnsRef"
-    :data="dataRef"
-    :loading="loadingRef"
-    :pagination="paginationReactive"
-    :row-key="(rowData) => rowData.ID"
-    @update:page="handlePageChange"
-    flex-height
-    style="height: calc(100vh - 310px); margin-top: 10px"
+      remote
+      size="small"
+      :columns="columnsRef"
+      :data="dataRef"
+      :loading="loadingRef"
+      :pagination="paginationReactive"
+      :row-key="(rowData) => rowData.ID"
+      @update:page="handlePageChange"
+      flex-height
+      style="height: calc(100vh - 310px); margin-top: 10px"
   />
 
   <n-modal v-model:show="showAddModal" preset="card" title="添加交易日志" style="width: 820px;max-width: calc(100vw - 32px);">
@@ -761,34 +770,34 @@ onUnmounted(() => {
         <n-grid-item>
           <n-form-item label="股票代码">
             <n-auto-complete
-              v-model:value="formData.StockCode"
-              :options="stockCodeOptions"
-              placeholder="请输入股票代码"
-              :input-props="{ autocomplete: 'disabled' }"
-              clearable
-              @update:value="searchStock"
-              @select="handleStockCodeSelect"
+                v-model:value="formData.StockCode"
+                :options="stockCodeOptions"
+                placeholder="请输入股票代码"
+                :input-props="{ autocomplete: 'disabled' }"
+                clearable
+                @update:value="searchStock"
+                @select="handleStockCodeSelect"
             />
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label="股票名称">
             <n-auto-complete
-              v-model:value="formData.StockName"
-              :options="stockNameOptions"
-              placeholder="请输入股票名称"
-              :input-props="{ autocomplete: 'disabled' }"
-              clearable
-              @update:value="searchStock"
-              @select="handleStockNameSelect"
+                v-model:value="formData.StockName"
+                :options="stockNameOptions"
+                placeholder="请输入股票名称"
+                :input-props="{ autocomplete: 'disabled' }"
+                clearable
+                @update:value="searchStock"
+                @select="handleStockNameSelect"
             />
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label="交易方向">
             <n-select
-              v-model:value="formData.Direction"
-              :options="[
+                v-model:value="formData.Direction"
+                :options="[
                 { label: '买入', value: '买入' },
                 { label: '卖出', value: '卖出' }
               ]"
@@ -797,42 +806,44 @@ onUnmounted(() => {
         </n-grid-item>
         <n-grid-item>
           <n-form-item label="价格">
-            <n-input-number v-model:value="formData.Price" :precision="2" :min="0" style="width: 100%" />
+            <n-input-number v-model:value="formData.Price" :precision="2" :min="0" style="width: 100%"/>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label="成交数量">
-            <n-input-number v-model:value="formData.Volume" :min="1" style="width: 100%" />
+            <n-input-number v-model:value="formData.Volume" :min="1" style="width: 100%"/>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label="交易时间">
-            <n-date-picker v-model:value="formData.TradingTime" type="datetime" style="width: 100%" />
+            <n-date-picker v-model:value="formData.TradingTime" type="datetime" style="width: 100%"/>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label="止损价">
-            <n-input-number v-model:value="formData.StopLossPrice" :precision="2" :min="0" style="width: 100%" />
+            <n-input-number v-model:value="formData.StopLossPrice" :precision="2" :min="0" style="width: 100%"/>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label="止盈价">
-            <n-input-number v-model:value="formData.TakeProfitPrice" :precision="2" :min="0" style="width: 100%" />
+            <n-input-number v-model:value="formData.TakeProfitPrice" :precision="2" :min="0" style="width: 100%"/>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label="手续费">
-            <n-input-number v-model:value="formData.Fee" :precision="2" :min="0" style="width: 100%" />
+            <n-input-number v-model:value="formData.Fee" :precision="2" :min="0" style="width: 100%"/>
           </n-form-item>
         </n-grid-item>
         <n-grid-item :span="3">
           <n-form-item label="交易理由">
-            <n-input v-model:value="formData.Reason" type="textarea" placeholder="请输入交易理由" :rows="4"  style="text-align: left" />
+            <n-input v-model:value="formData.Reason" type="textarea" placeholder="请输入交易理由" :rows="4"
+                     style="text-align: left"/>
           </n-form-item>
         </n-grid-item>
         <n-grid-item :span="3">
           <n-form-item label="交易心态/感悟/复盘/备注">
-            <n-input v-model:value="formData.Mindset" type="textarea" placeholder="请输入交易心态" :rows="5" style="text-align: left" />
+            <n-input v-model:value="formData.Mindset" type="textarea" placeholder="请输入交易心态" :rows="5"
+                     style="text-align: left"/>
           </n-form-item>
         </n-grid-item>
       </n-grid>
@@ -851,34 +862,34 @@ onUnmounted(() => {
         <n-grid-item>
           <n-form-item label="股票代码">
             <n-auto-complete
-              v-model:value="formData.StockCode"
-              :options="stockCodeOptions"
-              placeholder="请输入股票代码"
-              :input-props="{ autocomplete: 'disabled' }"
-              clearable
-              @update:value="searchStock"
-              @select="handleStockCodeSelect"
+                v-model:value="formData.StockCode"
+                :options="stockCodeOptions"
+                placeholder="请输入股票代码"
+                :input-props="{ autocomplete: 'disabled' }"
+                clearable
+                @update:value="searchStock"
+                @select="handleStockCodeSelect"
             />
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label="股票名称">
             <n-auto-complete
-              v-model:value="formData.StockName"
-              :options="stockNameOptions"
-              placeholder="请输入股票名称"
-              :input-props="{ autocomplete: 'disabled' }"
-              clearable
-              @update:value="searchStock"
-              @select="handleStockNameSelect"
+                v-model:value="formData.StockName"
+                :options="stockNameOptions"
+                placeholder="请输入股票名称"
+                :input-props="{ autocomplete: 'disabled' }"
+                clearable
+                @update:value="searchStock"
+                @select="handleStockNameSelect"
             />
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label="交易方向">
             <n-select
-              v-model:value="formData.Direction"
-              :options="[
+                v-model:value="formData.Direction"
+                :options="[
                 { label: '买入', value: '买入' },
                 { label: '卖出', value: '卖出' }
               ]"
@@ -887,42 +898,42 @@ onUnmounted(() => {
         </n-grid-item>
         <n-grid-item>
           <n-form-item label="价格">
-            <n-input-number v-model:value="formData.Price" :precision="2" :min="0" style="width: 100%" />
+            <n-input-number v-model:value="formData.Price" :precision="2" :min="0" style="width: 100%"/>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label="成交数量">
-            <n-input-number v-model:value="formData.Volume" :min="1" style="width: 100%" />
+            <n-input-number v-model:value="formData.Volume" :min="1" style="width: 100%"/>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label="交易时间">
-            <n-date-picker v-model:value="formData.TradingTime" type="datetime" style="width: 100%" />
+            <n-date-picker v-model:value="formData.TradingTime" type="datetime" style="width: 100%"/>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label="止损价">
-            <n-input-number v-model:value="formData.StopLossPrice" :precision="2" :min="0" style="width: 100%" />
+            <n-input-number v-model:value="formData.StopLossPrice" :precision="2" :min="0" style="width: 100%"/>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label="止盈价">
-            <n-input-number v-model:value="formData.TakeProfitPrice" :precision="2" :min="0" style="width: 100%" />
+            <n-input-number v-model:value="formData.TakeProfitPrice" :precision="2" :min="0" style="width: 100%"/>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label="手续费">
-            <n-input-number v-model:value="formData.Fee" :precision="2" :min="0" style="width: 100%" />
+            <n-input-number v-model:value="formData.Fee" :precision="2" :min="0" style="width: 100%"/>
           </n-form-item>
         </n-grid-item>
         <n-grid-item :span="3">
           <n-form-item label="交易理由">
-            <n-input v-model:value="formData.Reason" type="textarea" placeholder="请输入交易理由" :rows="2" />
+            <n-input v-model:value="formData.Reason" type="textarea" placeholder="请输入交易理由" :rows="2"/>
           </n-form-item>
         </n-grid-item>
         <n-grid-item :span="3">
           <n-form-item label="交易心态">
-            <n-input v-model:value="formData.Mindset" type="textarea" placeholder="请输入交易心态" :rows="2" />
+            <n-input v-model:value="formData.Mindset" type="textarea" placeholder="请输入交易心态" :rows="2"/>
           </n-form-item>
         </n-grid-item>
       </n-grid>
@@ -935,15 +946,16 @@ onUnmounted(() => {
     </template>
   </n-modal>
 
-  <n-modal v-model:show="showKlineModal" preset="card" :title="'K线 - ' + klineStockName" style="width: 95vw; max-width: 1400px">
+  <n-modal v-model:show="showKlineModal" preset="card" :title="'K线 - ' + klineStockName"
+           style="width: 95vw; max-width: 1400px">
     <StockLightweightKlineChart
-      :code="klineStockCode"
-      :stock-name="klineStockName"
-      :chart-height="500"
-      :dark-theme="darkTheme"
-      :longStopLossPrice="longStopLossPrice"
-      :longTakeProfitPrice="longTakeProfitPrice"
-      :costPrice="costPrice"
+        :code="klineStockCode"
+        :stock-name="klineStockName"
+        :chart-height="500"
+        :dark-theme="darkTheme"
+        :longStopLossPrice="longStopLossPrice"
+        :longTakeProfitPrice="longTakeProfitPrice"
+        :costPrice="costPrice"
     />
   </n-modal>
 </template>
