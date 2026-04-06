@@ -6,38 +6,36 @@ import {
   Quit,
   WindowFullscreen,
   WindowHide,
-  WindowUnfullscreen,
-  WindowSetTitle
+  WindowSetTitle,
+  WindowUnfullscreen
 } from '../wailsjs/runtime'
 import {h, onBeforeMount, onBeforeUnmount, onMounted, ref} from "vue";
 import {RouterLink, useRouter} from 'vue-router'
-import {createDiscreteApi,darkTheme,lightTheme , NIcon, NText,NButton,dateZhCN,zhCN} from 'naive-ui'
+import {createDiscreteApi, darkTheme, dateZhCN, lightTheme, NIcon, NText, zhCN} from 'naive-ui'
 import {
   AlarmOutline,
   AnalyticsOutline,
-  BarChartSharp, Bonfire, BonfireOutline, DiamondOutline, EaselSharp,
-  ExpandOutline, Flag,
-  Flame, FlameSharp, FlaskOutline, InformationOutline,
-  LogoGithub,
+  BarChartSharp,
+  DiamondOutline,
+  ExpandOutline,
+  Flag,
+  FlaskOutline,
   NewspaperOutline,
-  NewspaperSharp, Notifications,
-  PowerOutline, Pulse,
+  NewspaperSharp,
+  PowerOutline,
+  Pulse,
   ReorderTwoOutline,
-  SettingsOutline, Skull, SkullOutline, SkullSharp,
+  SettingsOutline,
   SparklesOutline,
   StarOutline,
-  Wallet, WarningOutline, TimeOutline,
+  TimeOutline,
 } from '@vicons/ionicons5'
-import {AnalyzeSentiment, GetConfig, GetGroupList,GetVersionInfo} from "../wailsjs/go/main/App";
-import FloatingAiAssistant from "./components/FloatingAiAssistant.vue";
+import {GetConfig, GetGroupList, GetVersionInfo} from "../wailsjs/go/main/App";
 import FloatingAgentAssistant from "./components/FloatingAgentAssistant.vue";
-import {Dragon, Fire, FirefoxBrowser, Gripfire, Robot} from "@vicons/fa";
-import {Prompt, ReportAnalytics, ReportMoney, ReportSearch, TrendingUp} from "@vicons/tabler";
-import {LocalFireDepartmentRound} from "@vicons/material";
-import {AppsList20Regular, BoxSearch20Regular, CommentNote20Filled} from "@vicons/fluent";
-import {FireFilled, MoneyCollectOutlined, NotificationFilled, StockOutlined} from "@vicons/antd";
-
-
+import {Dragon, FirefoxBrowser, Gripfire, Robot} from "@vicons/fa";
+import {Prompt, ReportAnalytics, ReportSearch, TrendingUp} from "@vicons/tabler";
+import {AppsList20Regular, BoxSearch20Regular} from "@vicons/fluent";
+import {MoneyCollectOutlined, NotificationFilled, StockOutlined} from "@vicons/antd";
 
 
 const router = useRouter()
@@ -55,7 +53,7 @@ const containerRef = ref({})
 const realtimeProfit = ref(0)
 const telegraph = ref([])
 const groupList = ref([])
-const officialStatement= ref("")
+const officialStatement = ref("")
 const menuOptions = ref([
   {
     label: () =>
@@ -435,7 +433,7 @@ const menuOptions = ref([
               to: {
                 name: 'agent',
                 query: {
-                  name:"Ai智能体",
+                  name: "Ai智能体",
                 },
                 onClick: () => {
                   activeKey.value = 'agent'
@@ -445,195 +443,195 @@ const menuOptions = ref([
             {default: () => 'Ai智能体'}
         ),
     key: 'agent',
-    show:enableAgent.value,
+    show: enableAgent.value,
     icon: renderIcon(Robot),
   },
-    {
-      label: () =>
-          h(
-              RouterLink,
-              {
-                to: {
-                  name: 'research',
-                  query: {
-                    name:"研究中心",
-                  },
-                },
-                onClick: () => {
-                  activeKey.value = 'research'
-                  setTimeout(() => {
-                    EventsEmit("changeResearchTab", {ID: 0, name: 'AI分析报告'})
-                  }, 100)
+  {
+    label: () =>
+        h(
+            RouterLink,
+            {
+              to: {
+                name: 'research',
+                query: {
+                  name: "研究中心",
                 },
               },
-              {default: () => '研究中心'}
-          ),
-      key: 'research',
-      icon: renderIcon(FlaskOutline),
-      children:[
-          {
-            label: () =>
-                h(
-                    RouterLink,
-                    {
-                      to: {
-                        name: 'research',
-                        query: {
-                          name:"AI分析报告",
-                        },
-                      },
-                      onClick: () => {
-                        activeKey.value = 'research'
-                        setTimeout(() => {
-                          EventsEmit("changeResearchTab", {ID: 0, name: 'AI分析报告'})
-                        }, 100)
-                      },
-                    },
-                    {default: () => 'AI分析报告'}
-                ),
-            key: 'research1',
-            icon: renderIcon(ReportAnalytics),
-          },
-        {
-          label: () =>
-              h(
-                  RouterLink,
-                  {
-                    to: {
-                      name: 'research',
-                      query: {
-                        name:"股票推荐记录",
-                      },
-                    },
-                    onClick: () => {
-                      activeKey.value = 'research'
-                      setTimeout(() => {
-                        EventsEmit("changeResearchTab", {ID: 1, name: '股票推荐记录'})
-                      }, 100)
+              onClick: () => {
+                activeKey.value = 'research'
+                setTimeout(() => {
+                  EventsEmit("changeResearchTab", {ID: 0, name: 'AI分析报告'})
+                }, 100)
+              },
+            },
+            {default: () => '研究中心'}
+        ),
+    key: 'research',
+    icon: renderIcon(FlaskOutline),
+    children: [
+      {
+        label: () =>
+            h(
+                RouterLink,
+                {
+                  to: {
+                    name: 'research',
+                    query: {
+                      name: "AI分析报告",
                     },
                   },
-                  {default: () => '股票推荐记录'}
-              ),
-          key: 'research2',
-          icon: renderIcon(DiamondOutline),
-        },
-        {
-          label: () =>
-              h(
-                  RouterLink,
-                  {
-                    to: {
-                      name: 'research',
-                      query: {
-                        name:"异动监控",
-                      },
-                    },
-                    onClick: () => {
-                      activeKey.value = 'research'
-                      setTimeout(() => {
-                        EventsEmit("changeResearchTab", {ID: 2, name: '异动监控'})
-                      }, 100)
+                  onClick: () => {
+                    activeKey.value = 'research'
+                    setTimeout(() => {
+                      EventsEmit("changeResearchTab", {ID: 0, name: 'AI分析报告'})
+                    }, 100)
+                  },
+                },
+                {default: () => 'AI分析报告'}
+            ),
+        key: 'research1',
+        icon: renderIcon(ReportAnalytics),
+      },
+      {
+        label: () =>
+            h(
+                RouterLink,
+                {
+                  to: {
+                    name: 'research',
+                    query: {
+                      name: "股票推荐记录",
                     },
                   },
-                  {default: () => '异动监控'}
-              ),
-          key: 'stockChanges',
-          icon: renderIcon(TrendingUp),
-        },
-        {
-          label: () =>
-              h(
-                  RouterLink,
-                  {
-                    to: {
-                      name: 'research',
-                      query: {
-                        name:"提示词模板",
-                      },
-                    },
-                    onClick: () => {
-                      activeKey.value = 'research'
-                      setTimeout(() => {
-                        EventsEmit("changeResearchTab", {ID: 3, name: '提示词模板'})
-                      }, 100)
+                  onClick: () => {
+                    activeKey.value = 'research'
+                    setTimeout(() => {
+                      EventsEmit("changeResearchTab", {ID: 1, name: '股票推荐记录'})
+                    }, 100)
+                  },
+                },
+                {default: () => '股票推荐记录'}
+            ),
+        key: 'research2',
+        icon: renderIcon(DiamondOutline),
+      },
+      {
+        label: () =>
+            h(
+                RouterLink,
+                {
+                  to: {
+                    name: 'research',
+                    query: {
+                      name: "异动监控",
                     },
                   },
-                  {default: () => '提示词模板'}
-              ),
-          key: 'research3',
-          icon: renderIcon(Prompt),
-        },
-        {
-          label: () =>
-              h(
-                  RouterLink,
-                  {
-                    to: {
-                      name: 'research',
-                      query: {
-                        name:"股票信息筛选",
-                      },
-                    },
-                    onClick: () => {
-                      activeKey.value = 'research'
-                      setTimeout(() => {
-                        EventsEmit("changeResearchTab", {ID: 3, name: '股票信息筛选'})
-                      }, 100)
+                  onClick: () => {
+                    activeKey.value = 'research'
+                    setTimeout(() => {
+                      EventsEmit("changeResearchTab", {ID: 2, name: '异动监控'})
+                    }, 100)
+                  },
+                },
+                {default: () => '异动监控'}
+            ),
+        key: 'stockChanges',
+        icon: renderIcon(TrendingUp),
+      },
+      {
+        label: () =>
+            h(
+                RouterLink,
+                {
+                  to: {
+                    name: 'research',
+                    query: {
+                      name: "提示词模板",
                     },
                   },
-                  {default: () => '股票信息筛选'}
-              ),
-          key: 'research4',
-          icon: renderIcon(AppsList20Regular),
-        },
-        {
-          label: () =>
-              h(
-                  RouterLink,
-                  {
-                    to: {
-                      name: 'cronTasks',
-                      query: {
-                        name:"定时任务",
-                      },
-                    },
-                    onClick: () => {
-                      activeKey.value = 'research'
-                      setTimeout(() => {
-                        EventsEmit("changeResearchTab", {ID: 5, name: '定时任务'})
-                      }, 100)
+                  onClick: () => {
+                    activeKey.value = 'research'
+                    setTimeout(() => {
+                      EventsEmit("changeResearchTab", {ID: 3, name: '提示词模板'})
+                    }, 100)
+                  },
+                },
+                {default: () => '提示词模板'}
+            ),
+        key: 'research3',
+        icon: renderIcon(Prompt),
+      },
+      {
+        label: () =>
+            h(
+                RouterLink,
+                {
+                  to: {
+                    name: 'research',
+                    query: {
+                      name: "股票信息筛选",
                     },
                   },
-                  {default: () => '定时任务'}
-              ),
-          key: 'research5',
-          icon: renderIcon(TimeOutline),
-        },
-        {
-          label: () =>
-              h(
-                  RouterLink,
-                  {
-                    to: {
-                      name: 'research',
-                      query: {
-                        name:"交易日志",
-                      },
-                    },
-                    onClick: () => {
-                      activeKey.value = 'research'
-                      setTimeout(() => {
-                        EventsEmit("changeResearchTab", {ID: 6, name: '交易日志'})
-                      }, 100)
+                  onClick: () => {
+                    activeKey.value = 'research'
+                    setTimeout(() => {
+                      EventsEmit("changeResearchTab", {ID: 3, name: '股票信息筛选'})
+                    }, 100)
+                  },
+                },
+                {default: () => '股票信息筛选'}
+            ),
+        key: 'research4',
+        icon: renderIcon(AppsList20Regular),
+      },
+      {
+        label: () =>
+            h(
+                RouterLink,
+                {
+                  to: {
+                    name: 'cronTasks',
+                    query: {
+                      name: "定时任务",
                     },
                   },
-                  {default: () => '交易日志(beta)'}
-              ),
-          key: 'research6',
-          icon: renderIcon(MoneyCollectOutlined),
-        },
-      ],
-    },
+                  onClick: () => {
+                    activeKey.value = 'research'
+                    setTimeout(() => {
+                      EventsEmit("changeResearchTab", {ID: 5, name: '定时任务'})
+                    }, 100)
+                  },
+                },
+                {default: () => '定时任务'}
+            ),
+        key: 'research5',
+        icon: renderIcon(TimeOutline),
+      },
+      {
+        label: () =>
+            h(
+                RouterLink,
+                {
+                  to: {
+                    name: 'research',
+                    query: {
+                      name: "交易日志",
+                    },
+                  },
+                  onClick: () => {
+                    activeKey.value = 'research'
+                    setTimeout(() => {
+                      EventsEmit("changeResearchTab", {ID: 6, name: '交易日志'})
+                    }, 100)
+                  },
+                },
+                {default: () => '交易日志(beta)'}
+            ),
+        key: 'research6',
+        icon: renderIcon(MoneyCollectOutlined),
+      },
+    ],
+  },
   {
     label: () =>
         h(
@@ -642,7 +640,7 @@ const menuOptions = ref([
               to: {
                 name: 'settings',
                 query: {
-                  name:"设置",
+                  name: "设置",
                 },
                 onClick: () => {
                   activeKey.value = 'settings'
@@ -654,28 +652,28 @@ const menuOptions = ref([
     key: 'settings',
     icon: renderIcon(SettingsOutline),
   },
+  // {
+  //   label: () =>
+  //       h(
+  //           RouterLink,
+  //           {
+  //             to: {
+  //               name: 'about',
+  //               query: {
+  //                 name:"关于",
+  //               }
+  //             },
+  //             onClick: () => {
+  //               activeKey.value = 'about'
+  //             },
+  //           },
+  //           {default: () => '关于'}
+  //       ),
+  //   key: 'about',
+  //   icon: renderIcon(LogoGithub),
+  // },
   {
-    label: () =>
-        h(
-            RouterLink,
-            {
-              to: {
-                name: 'about',
-                query: {
-                  name:"关于",
-                }
-              },
-              onClick: () => {
-                activeKey.value = 'about'
-              },
-            },
-            {default: () => '关于'}
-        ),
-    key: 'about',
-    icon: renderIcon(LogoGithub),
-  },
-  {
-    show:false,
+    show: false,
     label: () => h("a", {
       href: '#',
       onClick: toggleFullscreen,
@@ -754,12 +752,12 @@ EventsOn("telegraph", (data) => {
 })
 
 EventsOn("loadingMsg", (data) => {
-  if(data==="done"){
+  if (data === "done") {
     loadingMsg.value = "加载完成..."
     EventsEmit("loadingDone", "app")
-    loading.value  = false
-  }else{
-    loading.value  = true
+    loading.value = false
+  } else {
+    loading.value = true
     loadingMsg.value = data
   }
 })
@@ -786,8 +784,8 @@ window.onerror = function (msg, source, lineno, colno, error) {
 
 onBeforeMount(() => {
   GetVersionInfo().then(result => {
-    if(result.officialStatement){
-      content.value = result.officialStatement+"\n\n"+content.value
+    if (result.officialStatement) {
+      content.value = result.officialStatement + "\n\n" + content.value
       officialStatement.value = result.officialStatement
     }
   })
@@ -859,7 +857,7 @@ onBeforeMount(() => {
 })
 
 onMounted(() => {
-  WindowSetTitle("go-stock：AI赋能股票分析✨ "+officialStatement.value+"  未经授权,禁止商业目的！ [数据来源于网络,仅供参考;投资有风险,入市需谨慎]")
+  WindowSetTitle("go-stock：AI赋能股票分析✨ " + officialStatement.value + "  未经授权,禁止商业目的！ [数据来源于网络,仅供参考;投资有风险,入市需谨慎]")
   contentStyle.value = "max-height: calc(92vh);overflow: hidden"
   GetConfig().then((res) => {
     if (res.enableNews) {
@@ -867,39 +865,43 @@ onMounted(() => {
     }
     enableFund.value = res.enableFund
     enableAgent.value = res.enableAgent
-    const {notification } =createDiscreteApi(["notification"], {
+    const {notification} = createDiscreteApi(["notification"], {
       configProviderProps: {
-        theme: enableDarkTheme.value ? darkTheme : lightTheme ,
+        theme: enableDarkTheme.value ? darkTheme : lightTheme,
         max: 3,
       },
     })
     EventsOn("newsPush", (data) => {
       //console.log(data)
-      if(data.isRed){
+      if (data.isRed) {
         notification.create({
           //type:"error",
-         // avatar: () => h(NIcon,{component:Notifications,color:"red"}),
+          // avatar: () => h(NIcon,{component:Notifications,color:"red"}),
           title: data.time,
-          content: () => h('div',{type:"error",style:{
-              "text-align":"left",
-              "font-size":"14px",
-              "color":"#f67979"
-            }}, { default: () => data.content }),
-          meta: () => h(NText,{type:"warning"}, { default: () => data.source}),
-          duration:1000*40,
+          content: () => h('div', {
+            type: "error", style: {
+              "text-align": "left",
+              "font-size": "14px",
+              "color": "#f67979"
+            }
+          }, {default: () => data.content}),
+          meta: () => h(NText, {type: "warning"}, {default: () => data.source}),
+          duration: 1000 * 40,
         })
-      }else{
-         notification.create({
+      } else {
+        notification.create({
           //type:"info",
           //avatar: () => h(NIcon,{component:Notifications}),
           title: data.time,
-          content: () => h('div',{type:"info",style:{
-            "text-align":"left",
-              "font-size":"14px",
-              "color": data.source==="go-stock"?"#F98C24":"#549EC8"
-            }}, { default: () => data.content }),
-          meta: () => h(NText,{type:"warning"}, { default: () => data.source}),
-          duration:1000*30 ,
+          content: () => h('div', {
+            type: "info", style: {
+              "text-align": "left",
+              "font-size": "14px",
+              "color": data.source === "go-stock" ? "#F98C24" : "#549EC8"
+            }
+          }, {default: () => data.content}),
+          meta: () => h(NText, {type: "warning"}, {default: () => data.source}),
+          duration: 1000 * 30,
         })
       }
     })
@@ -924,8 +926,8 @@ onMounted(() => {
                 :y-offset="150"
                 :rotate="-15"
             >
-<!--              <FloatingAiAssistant />-->
-              <FloatingAgentAssistant />
+              <!--              <FloatingAiAssistant />-->
+              <FloatingAgentAssistant/>
               <n-flex>
                 <n-grid x-gap="12" :cols="1">
                   <n-gi>
@@ -940,7 +942,7 @@ onMounted(() => {
                         </n-tag>
                       </n-marquee>
                       <n-scrollbar :style="contentStyle">
-                        <n-skeleton v-if="loading" height="calc(100vh)" />
+                        <n-skeleton v-if="loading" height="calc(100vh)"/>
                         <RouterView/>
                       </n-scrollbar>
                     </n-spin>

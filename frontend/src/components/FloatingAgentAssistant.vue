@@ -1,27 +1,27 @@
 <template>
   <Transition name="fade">
     <div
-      v-if="showButton"
-      :class="['edge-trigger', { 'edge-trigger-busy': hasBackgroundTask }]"
-      @click="togglePanel"
-      :title="hasBackgroundTask ? 'go-stock AI Agent 助手正在后台分析...' : 'go-stock AI Agent 助手'"
+        v-if="showButton"
+        :class="['edge-trigger', { 'edge-trigger-busy': hasBackgroundTask }]"
+        @click="togglePanel"
+        :title="hasBackgroundTask ? 'go-stock AI Agent 助手正在后台分析...' : 'go-stock AI Agent 助手'"
     >
       <div class="edge-trigger-inner">
-        <NIcon :component="SparklesOutline" size="22" />
-        <div v-if="hasBackgroundTask" class="edge-trigger-badge" />
+        <NIcon :component="SparklesOutline" size="22"/>
+        <div v-if="hasBackgroundTask" class="edge-trigger-badge"/>
       </div>
     </div>
   </Transition>
 
   <Transition name="drawer-slide">
     <div v-if="panelVisible" class="drawer-wrap">
-      <div class="drawer-mask" @click="closePanel" />
+      <div class="drawer-mask" @click="closePanel"/>
       <div class="drawer-panel" @click.stop>
         <NCard
-          size="small"
-          class="panel-card"
-          :bordered="false"
-          content-style="padding: 0; display: flex; flex-direction: column; height: 100%;"
+            size="small"
+            class="panel-card"
+            :bordered="false"
+            content-style="padding: 0; display: flex; flex-direction: column; height: 100%;"
         >
           <template #header>
             <div class="panel-header">
@@ -30,14 +30,15 @@
                 <NButton size="small" quaternary @click="startNewChat" title="开始新对话">
                   新对话
                 </NButton>
-                <NButton quaternary circle size="small" title="分享到社区" :loading="shareLoading" @click="shareAiToCommunity">
+                <NButton quaternary circle size="small" title="分享到社区" :loading="shareLoading"
+                         @click="shareAiToCommunity">
                   <template #icon>
-                    <NIcon :component="ShareSocialOutline" />
+                    <NIcon :component="ShareSocialOutline"/>
                   </template>
                 </NButton>
                 <NButton quaternary circle size="small" title="关闭" @click="closePanel">
                   <template #icon>
-                    <NIcon :component="CloseOutline" />
+                    <NIcon :component="CloseOutline"/>
                   </template>
                 </NButton>
               </div>
@@ -52,20 +53,23 @@
             <NScrollbar ref="scrollbarRef" class="chat-scroll">
               <div class="message-list">
                 <div
-                  v-for="(group, groupIndex) in messageGroups"
-                  :key="group.id"
-                  class="message-group"
+                    v-for="(group, groupIndex) in messageGroups"
+                    :key="group.id"
+                    class="message-group"
                 >
                   <div class="message-group-header" @click="toggleGroup(groupIndex)">
                     <div class="message-group-summary">
-                      <NIcon :component="isGroupExpanded(groupIndex) ? ChevronDownOutline : ChevronForwardOutline" size="16" />
-                      <span class="message-group-title">{{ group.userMsg.content.slice(0, 50) }}{{ group.userMsg.content.length > 50 ? '...' : '' }}</span>
+                      <NIcon :component="isGroupExpanded(groupIndex) ? ChevronDownOutline : ChevronForwardOutline"
+                             size="16"/>
+                      <span class="message-group-title">{{
+                          group.userMsg.content.slice(0, 50)
+                        }}{{ group.userMsg.content.length > 50 ? '...' : '' }}</span>
                       <span class="message-group-time">{{ group.userMsg.time }}</span>
                     </div>
                   </div>
                   <div v-show="isGroupExpanded(groupIndex)" class="message-group-content">
                     <div
-                      :class="['message-item', group.userMsg.role]"
+                        :class="['message-item', group.userMsg.role]"
                     >
                       <div class="msg-bubble">
                         <div class="msg-content">
@@ -73,72 +77,79 @@
                             <span class="msg-time">{{ group.userMsg.time }}</span>
                           </div>
                           <MdPreview
-                            :theme="theme"
-                            :style="{ textAlign: 'right' }"
-                            v-if="group.userMsg.content"
-                            :model-value="group.userMsg.content"
-                            :editor-id="'agent-msg-' + group.userIndex"
-                            class="msg-markdown"
+                              :theme="theme"
+                              :style="{ textAlign: 'right' }"
+                              v-if="group.userMsg.content"
+                              :model-value="group.userMsg.content"
+                              :editor-id="'agent-msg-' + group.userIndex"
+                              class="msg-markdown"
                           />
                         </div>
                       </div>
                       <div class="msg-avatar user-avatar">
-                        <NIcon :component="PersonCircleOutline" size="20" />
+                        <NIcon :component="PersonCircleOutline" size="20"/>
                       </div>
                     </div>
                     <div
-                      v-if="group.assistantMsg"
-                      :class="['message-item', 'assistant']"
+                        v-if="group.assistantMsg"
+                        :class="['message-item', 'assistant']"
                     >
                       <div class="msg-avatar assistant-avatar">
-                        <NIcon :component="SparklesOutline" size="20" />
+                        <NIcon :component="SparklesOutline" size="20"/>
                       </div>
                       <div class="msg-bubble">
                         <div class="msg-content">
                           <MdPreview
-                            :theme="theme"
-                            :style="{ textAlign: 'left' }"
-                            :model-value="group.assistantMsg.content || '...'"
-                            :editor-id="'agent-msg-' + group.assistantIndex"
-                            class="msg-markdown"
+                              :theme="theme"
+                              :style="{ textAlign: 'left' }"
+                              :model-value="group.assistantMsg.content || '...'"
+                              :editor-id="'agent-msg-' + group.assistantIndex"
+                              class="msg-markdown"
                           />
-                          <div v-if="isStreamLoad && groupIndex === messageGroups.length - 1 && !group.assistantMsg.content" class="msg-loading">
-                            <NSpin size="small" />
+                          <div
+                              v-if="isStreamLoad && groupIndex === messageGroups.length - 1 && !group.assistantMsg.content"
+                              class="msg-loading">
+                            <NSpin size="small"/>
                             <span>思考中...</span>
                           </div>
                           <div class="msg-bubble-actions">
-                            <div v-if="group.assistantMsg.modelName || group.assistantMsg.time" class="msg-meta-row-assistant">
-                              <span v-if="group.assistantMsg.modelName" class="msg-model-name" :title="group.assistantMsg.modelName">{{ group.assistantMsg.modelName }}</span>
+                            <div v-if="group.assistantMsg.modelName || group.assistantMsg.time"
+                                 class="msg-meta-row-assistant">
+                              <span v-if="group.assistantMsg.modelName" class="msg-model-name"
+                                    :title="group.assistantMsg.modelName">{{ group.assistantMsg.modelName }}</span>
                               <span v-if="group.assistantMsg.time" class="msg-time">{{ group.assistantMsg.time }}</span>
                             </div>
                             <NButton quaternary size="tiny" class="msg-toggle-btn" @click="toggleGroup(groupIndex)">
                               <template #icon>
-                                <NIcon :component="isGroupExpanded(groupIndex) ? ChevronUpOutline : ChevronDownOutline" />
+                                <NIcon
+                                    :component="isGroupExpanded(groupIndex) ? ChevronUpOutline : ChevronDownOutline"/>
                               </template>
                               {{ isGroupExpanded(groupIndex) ? '收起' : '展开' }}
                             </NButton>
-                            <NButton quaternary size="tiny" class="msg-copy-btn" @click="copyAiContent(group.assistantMsg)">
+                            <NButton quaternary size="tiny" class="msg-copy-btn"
+                                     @click="copyAiContent(group.assistantMsg)">
                               <template #icon>
-                                <NIcon :component="CopyOutline" />
+                                <NIcon :component="CopyOutline"/>
                               </template>
                               复制
                             </NButton>
                             <NButton
-                              quaternary
-                              size="tiny"
-                              class="msg-export-img-btn"
-                              :loading="exportImageKey === String(group.assistantIndex)"
-                              title="导出为图片"
-                              @click="exportAiReplyImage(group.assistantIndex, $event)"
+                                quaternary
+                                size="tiny"
+                                class="msg-export-img-btn"
+                                :loading="exportImageKey === String(group.assistantIndex)"
+                                title="导出为图片"
+                                @click="exportAiReplyImage(group.assistantIndex, $event)"
                             >
                               <template #icon>
-                                <NIcon :component="ImageOutline" />
+                                <NIcon :component="ImageOutline"/>
                               </template>
                               导出图
                             </NButton>
-                            <NButton quaternary size="tiny" class="msg-share-btn" :loading="shareLoading" @click="shareAiContent(group.assistantMsg)">
+                            <NButton quaternary size="tiny" class="msg-share-btn" :loading="shareLoading"
+                                     @click="shareAiContent(group.assistantMsg)">
                               <template #icon>
-                                <NIcon :component="ShareSocialOutline" />
+                                <NIcon :component="ShareSocialOutline"/>
                               </template>
                               分享
                             </NButton>
@@ -154,85 +165,85 @@
             <div class="chat-footer">
               <div class="chat-footer-row">
                 <NSelect
-                  v-model:value="aiConfigId"
-                  :options="aiConfigOptions"
-                  size="small"
-                  filterable
-                  to="body"
-                  placement="top-start"
-                  placeholder="选择模型"
-                  :consistent-menu-width="false"
-                  :menu-props="{ style: { zIndex: 10002 } }"
-                  class="chat-footer-select"
+                    v-model:value="aiConfigId"
+                    :options="aiConfigOptions"
+                    size="small"
+                    filterable
+                    to="body"
+                    placement="top-start"
+                    placeholder="选择模型"
+                    :consistent-menu-width="false"
+                    :menu-props="{ style: { zIndex: 10002 } }"
+                    class="chat-footer-select"
                 />
                 <NSelect
-                  v-model:value="sysPromptId"
-                  :options="sysPromptOptions"
-                  size="small"
-                  clearable
-                  to="body"
-                  placement="top-start"
-                  placeholder="系统提示词"
-                  :consistent-menu-width="false"
-                  :menu-props="{ style: { zIndex: 10002 } }"
-                  class="chat-footer-prompt"
+                    v-model:value="sysPromptId"
+                    :options="sysPromptOptions"
+                    size="small"
+                    clearable
+                    to="body"
+                    placement="top-start"
+                    placeholder="系统提示词"
+                    :consistent-menu-width="false"
+                    :menu-props="{ style: { zIndex: 10002 } }"
+                    class="chat-footer-prompt"
                 />
                 <NSelect
-                  v-model:value="userPromptId"
-                  :options="userPromptOptions"
-                  size="small"
-                  clearable
-                  to="body"
-                  placement="top-start"
-                  placeholder="用户提示词"
-                  :consistent-menu-width="false"
-                  :menu-props="{ style: { zIndex: 10002 } }"
-                  class="chat-footer-prompt"
-                  @update:value="onUserPromptChange"
+                    v-model:value="userPromptId"
+                    :options="userPromptOptions"
+                    size="small"
+                    clearable
+                    to="body"
+                    placement="top-start"
+                    placeholder="用户提示词"
+                    :consistent-menu-width="false"
+                    :menu-props="{ style: { zIndex: 10002 } }"
+                    class="chat-footer-prompt"
+                    @update:value="onUserPromptChange"
                 />
                 <div class="chat-footer-thinking">
                   <span class="chat-footer-thinking-label">思考模式</span>
-                  <NSwitch v-model:value="thinkingMode" size="small" />
+                  <NSwitch v-model:value="thinkingMode" size="small"/>
                 </div>
                 <div class="chat-footer-memory">
                   <span class="chat-footer-thinking-label">记忆模式</span>
-                  <NSwitch v-model:value="memoryMode" size="small" />
+                  <NSwitch v-model:value="memoryMode" size="small"/>
                   <NSelect
-                    v-if="memoryMode"
-                    v-model:value="memoryCount"
-                    :options="memoryCountOptions"
-                    size="small"
-                    :consistent-menu-width="false"
-                    to="body"
-                    placement="top-start"
-                    :menu-props="{ style: { zIndex: 10002 } }"
-                    class="chat-footer-memory-count"
+                      v-if="memoryMode"
+                      v-model:value="memoryCount"
+                      :options="memoryCountOptions"
+                      size="small"
+                      :consistent-menu-width="false"
+                      to="body"
+                      placement="top-start"
+                      :menu-props="{ style: { zIndex: 10002 } }"
+                      class="chat-footer-memory-count"
                   />
                 </div>
               </div>
               <div class="chat-footer-input">
                 <NInput
-                  v-model:value="inputValue"
-                  type="textarea"
-                  placeholder="输入消息，回车发送..."
-                  :autosize="{ minRows: 2, maxRows: 4 }"
-                  :disabled="isStreamLoad"
-                  @keydown.enter.exact.prevent="sendMessage"
+                    v-model:value="inputValue"
+                    type="textarea"
+                    placeholder="输入消息，回车发送..."
+                    :autosize="{ minRows: 2, maxRows: 4 }"
+                    :disabled="isStreamLoad"
+                    @keydown.enter.exact.prevent="sendMessage"
                 />
                 <NButton
-                  v-if="isStreamLoad"
-                  type="warning"
-                  quaternary
-                  class="chat-footer-abort"
-                  @click="abortStream(true)"
+                    v-if="isStreamLoad"
+                    type="warning"
+                    quaternary
+                    class="chat-footer-abort"
+                    @click="abortStream(true)"
                 >
                   中断
                 </NButton>
                 <NButton
-                  type="primary"
-                  :loading="isStreamLoad"
-                  :disabled="isStreamLoad || !canSend"
-                  @click="sendMessage"
+                    type="primary"
+                    :loading="isStreamLoad"
+                    :disabled="isStreamLoad || !canSend"
+                    @click="sendMessage"
                 >
                   发送
                 </NButton>
@@ -246,34 +257,33 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount, onBeforeMount } from 'vue'
-import { useRoute } from 'vue-router'
-import { NButton, NCard, NIcon, NInput, NScrollbar, NSelect, NSpin, NSwitch, useMessage } from 'naive-ui'
+import {computed, nextTick, onBeforeMount, onBeforeUnmount, onMounted, ref, watch} from 'vue'
+import {useRoute} from 'vue-router'
+import {NButton, NCard, NIcon, NInput, NScrollbar, NSelect, NSpin, NSwitch, useMessage} from 'naive-ui'
 import {
-  CloseOutline,
-  SparklesOutline,
-  PersonCircleOutline,
-  CopyOutline,
-  ShareSocialOutline,
-  ImageOutline,
   ChevronDownOutline,
   ChevronForwardOutline,
-  ChevronUpOutline
+  ChevronUpOutline,
+  CloseOutline,
+  CopyOutline,
+  ImageOutline,
+  PersonCircleOutline,
+  ShareSocialOutline,
+  SparklesOutline
 } from '@vicons/ionicons5'
 import {
+  AbortChatWithAgent,
   ChatWithAgent,
+  GetAiAssistantSession,
   GetAiConfigs,
   GetConfig,
   GetPromptTemplates,
-  GetSponsorInfo,
   SaveAiAssistantSession,
-  GetAiAssistantSession,
-  ShareText,
-  AbortChatWithAgent,
-  SaveAIResponseResult
+  SaveAIResponseResult,
+  ShareText
 } from '../../wailsjs/go/main/App'
-import { EventsOff, EventsOn } from '../../wailsjs/runtime'
-import { MdPreview } from 'md-editor-v3'
+import {EventsOff, EventsOn} from '../../wailsjs/runtime'
+import {MdPreview} from 'md-editor-v3'
 import 'md-editor-v3/lib/preview.css'
 import html2canvas from 'html2canvas'
 
@@ -303,25 +313,25 @@ function modelLabelForConfig(configId) {
 
 const sysPromptTemplates = ref([])
 const sysPromptOptions = computed(() =>
-  sysPromptTemplates.value.map(t => ({ label: t.name ?? '', value: t.ID ?? t.id }))
+    sysPromptTemplates.value.map(t => ({label: t.name ?? '', value: t.ID ?? t.id}))
 )
 const sysPromptId = ref(null)
 
 const userPromptTemplates = ref([])
 const userPromptOptions = computed(() =>
-  userPromptTemplates.value.map(t => ({ label: t.name ?? '', value: t.ID ?? t.id }))
+    userPromptTemplates.value.map(t => ({label: t.name ?? '', value: t.ID ?? t.id}))
 )
 const userPromptId = ref(null)
 const thinkingMode = ref(false)
 const memoryMode = ref(true)
 const memoryCount = ref(3)
 const memoryCountOptions = [
-  { label: '1 条', value: 1 },
-  { label: '2 条', value: 2 },
-  { label: '3 条', value: 3 },
-  { label: '4 条', value: 4 },
-  { label: '5 条', value: 5 },
-  { label: '10 条', value: 10 },
+  {label: '1 条', value: 1},
+  {label: '2 条', value: 2},
+  {label: '3 条', value: 3},
+  {label: '4 条', value: 4},
+  {label: '5 条', value: 5},
+  {label: '10 条', value: 10},
 ]
 
 function onUserPromptChange(id) {
@@ -349,7 +359,7 @@ const AGENT_EVENT = 'agent-message'
 const messageGroups = computed(() => {
   const groups = []
   let currentGroup = null
-  
+
   for (let i = 0; i < messages.value.length; i++) {
     const msg = messages.value[i]
     if (msg.role === 'user') {
@@ -435,17 +445,17 @@ function shareTextToCommunity(text, title) {
   shareTipText.value = '正在分享到社区...'
   shareTipVisible.value = true
   ShareText(text, title)
-    .then((msg) => {
-      shareTipText.value = msg
-      shareTipVisible.value = true
-    })
-    .catch((err) => {
-      shareTipText.value = '分享失败: ' + (err?.message ?? err)
-      shareTipVisible.value = true
-    })
-    .finally(() => {
-      shareLoading.value = false
-    })
+      .then((msg) => {
+        shareTipText.value = msg
+        shareTipVisible.value = true
+      })
+      .catch((err) => {
+        shareTipText.value = '分享失败: ' + (err?.message ?? err)
+        shareTipVisible.value = true
+      })
+      .finally(() => {
+        shareLoading.value = false
+      })
 }
 
 function shareAiContent(msg) {
@@ -495,9 +505,9 @@ async function exportAiReplyImage(assistantIndex, evt) {
   await nextTick()
   try {
     const target = document.getElementById(`${editorId}-preview-wrapper`) ||
-      document.getElementById(`${editorId}-preview`) ||
-      bubble?.querySelector('.md-editor-preview') ||
-      null
+        document.getElementById(`${editorId}-preview`) ||
+        bubble?.querySelector('.md-editor-preview') ||
+        null
     if (!target) {
       shareTipText.value = '未找到预览区域，请展开回答后重试'
       shareTipVisible.value = true
@@ -568,7 +578,8 @@ function saveHistory() {
     time: m.time ?? '',
     modelName: m.modelName ?? ''
   }))
-  SaveAiAssistantSession(sessionId.value, list).catch(() => {})
+  SaveAiAssistantSession(sessionId.value, list).catch(() => {
+  })
 }
 
 function openPanel() {
@@ -597,27 +608,32 @@ function closePanel() {
 }
 
 async function ensureVipInfo() {
-  if (vipLoaded.value || vipLoading.value) return
-  vipLoading.value = true
-  try {
-    const res = await GetSponsorInfo()
-    const lvl = Number(res?.vipLevel ?? 0)
-    vipLevel.value = Number.isNaN(lvl) ? 0 : lvl
-  } catch (_) {
-    vipLevel.value = 0
-  } finally {
-    vipLoaded.value = true
-    vipLoading.value = false
-  }
+  // VIP检查已移除，直接设置为VIP2权限
+  vipLevel.value = 2
+  vipLoaded.value = true
+  vipLoading.value = false
+  // if (vipLoaded.value || vipLoading.value) return
+  // vipLoading.value = true
+  // try {
+  //   const res = await GetSponsorInfo()
+  //   const lvl = Number(res?.vipLevel ?? 0)
+  //   vipLevel.value = Number.isNaN(lvl) ? 0 : lvl
+  // } catch (_) {
+  //   vipLevel.value = 0
+  // } finally {
+  //   vipLoaded.value = true
+  //   vipLoading.value = false
+  // }
 }
 
 async function togglePanel() {
   if (!panelVisible.value) {
-    await ensureVipInfo()
-    if ((vipLevel.value ?? 0) < 2) {
-      message.warning('go-stock AI Agent 助手功能仅对 VIP2 及以上赞助用户开放，请前往关于页面查看赞助方式。')
-      return
-    }
+    // VIP检查已移除，所有用户都可以使用AI助手
+    // await ensureVipInfo()
+    // if ((vipLevel.value ?? 0) < 2) {
+    //   message.warning('go-stock AI Agent 助手功能仅对 VIP2 及以上赞助用户开放，请前往关于页面查看赞助方式。')
+    //   return
+    // }
     openPanel()
   } else {
     closePanel()
@@ -626,7 +642,7 @@ async function togglePanel() {
 
 function scrollToBottom() {
   nextTick(() => {
-    scrollbarRef.value?.scrollTo({ top: 99999, behavior: 'smooth' })
+    scrollbarRef.value?.scrollTo({top: 99999, behavior: 'smooth'})
   })
 }
 
@@ -687,7 +703,7 @@ function onAgentMessage(msg) {
     const last = messages.value[messages.value.length - 1]
     if (msg.content === 'agent-DONE' && last && last.role === 'assistant' && last.content) {
       const user = messages.value[messages.value.length - 2]
-      SaveAIResponseResult("agent","市场分析", last.content, sessionId.value,user.content, aiConfigId.value)
+      SaveAIResponseResult("agent", "市场分析", last.content, sessionId.value, user.content, aiConfigId.value)
     }
     return
   }
@@ -783,19 +799,23 @@ onBeforeUnmount(() => {
   box-shadow: -2px 0 12px rgba(102, 126, 234, 0.4);
   transition: width 0.2s ease, box-shadow 0.2s ease;
 }
+
 .edge-trigger-busy {
   box-shadow: -4px 0 18px rgba(248, 113, 113, 0.8);
 }
+
 .edge-trigger:hover {
   width: 40px;
   box-shadow: -4px 0 16px rgba(102, 126, 234, 0.5);
 }
+
 .edge-trigger-inner {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
 }
+
 .edge-trigger-badge {
   position: absolute;
   top: 6px;
@@ -809,8 +829,12 @@ onBeforeUnmount(() => {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .drawer-wrap {
@@ -819,15 +843,18 @@ onBeforeUnmount(() => {
   z-index: 9999;
   pointer-events: none;
 }
+
 .drawer-wrap > * {
   pointer-events: auto;
 }
+
 .drawer-mask {
   position: absolute;
   inset: 0;
   background: rgba(0, 0, 0, 0.35);
   cursor: pointer;
 }
+
 .drawer-panel {
   position: absolute;
   top: 0;
@@ -851,10 +878,12 @@ onBeforeUnmount(() => {
   flex-direction: column;
   min-height: 0;
 }
+
 .panel-card :deep(.n-card-header) {
   padding: 12px 16px;
   flex-shrink: 0;
 }
+
 .panel-card :deep(.n-card__content) {
   flex: 1;
   min-height: 0;
@@ -862,16 +891,19 @@ onBeforeUnmount(() => {
   flex-direction: column;
   overflow: hidden;
 }
+
 .panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
+
 .panel-actions {
   display: flex;
   align-items: center;
   gap: 6px;
 }
+
 .panel-title {
   font-weight: 600;
   font-size: 16px;
@@ -884,6 +916,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow: hidden;
 }
+
 .share-tip {
   flex-shrink: 0;
   margin: 10px 16px 0;
@@ -895,6 +928,7 @@ onBeforeUnmount(() => {
   gap: 10px;
   align-items: flex-start;
 }
+
 .share-tip-text {
   flex: 1;
   min-width: 0;
@@ -904,9 +938,11 @@ onBeforeUnmount(() => {
   word-break: break-word;
   text-align: left;
 }
+
 .share-tip-close {
   flex-shrink: 0;
 }
+
 .chat-scroll {
   flex: 1;
   min-height: 0;
@@ -914,22 +950,26 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
 }
+
 .chat-scroll :deep(.n-scrollbar-content) {
   flex: 1;
   min-height: 0;
 }
+
 .message-list {
   padding: 12px 16px 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
+
 .message-group {
   border: 1px solid var(--n-border-color);
   border-radius: 12px;
   overflow: hidden;
   background: var(--n-color-modal);
 }
+
 .message-group-header {
   padding: 10px 14px;
   cursor: pointer;
@@ -937,14 +977,17 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid var(--n-border-color);
   transition: background 0.2s;
 }
+
 .message-group-header:hover {
   background: rgba(0, 0, 0, 0.04);
 }
+
 .message-group-summary {
   display: flex;
   align-items: center;
   gap: 8px;
 }
+
 .message-group-title {
   flex: 1;
   font-size: 13px;
@@ -953,28 +996,34 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .message-group-time {
   font-size: 11px;
   color: var(--n-text-color-3);
   flex-shrink: 0;
 }
+
 .message-group-content {
   padding: 12px 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
+
 .message-group-content .message-item {
   padding: 0 14px;
 }
+
 .message-item {
   display: flex;
   gap: 10px;
   align-items: flex-start;
 }
+
 .message-item.user {
   justify-content: flex-end;
 }
+
 .msg-avatar {
   width: 32px;
   height: 32px;
@@ -984,16 +1033,19 @@ onBeforeUnmount(() => {
   justify-content: center;
   flex-shrink: 0;
 }
+
 .assistant-avatar {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #fff;
 }
+
 .user-avatar {
   background: linear-gradient(135deg, #34d399 0%, #22c55e 35%, #06b6d4 100%);
   color: #fff;
   box-shadow: 0 6px 14px rgba(34, 197, 94, 0.22);
   border: 1px solid rgba(255, 255, 255, 0.45);
 }
+
 .msg-bubble {
   max-width: 100%;
   flex: 1;
@@ -1008,26 +1060,31 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
 }
+
 .message-item.assistant .msg-bubble {
   background: var(--n-color-modal);
   border: 1px solid var(--n-border-color);
 }
+
 .message-item.user .msg-bubble {
   background: var(--n-color-primary);
   color: #fff;
   text-align: right;
 }
+
 .message-item.user .msg-content,
 .message-item.user .msg-content :deep(.md-editor-preview),
 .message-item.user .msg-content :deep(.md-editor-preview-wrapper) {
   text-align: right;
 }
+
 .msg-content {
   white-space: normal;
   width: 100%;
   min-width: 0;
   flex: 1;
 }
+
 .msg-bubble-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1036,6 +1093,7 @@ onBeforeUnmount(() => {
   align-items: center;
   margin-top: 8px;
 }
+
 .msg-meta-row-assistant {
   flex: 1 1 100%;
   display: flex;
@@ -1045,9 +1103,11 @@ onBeforeUnmount(() => {
   font-size: 11px;
   color: var(--n-text-color-3);
 }
+
 .msg-meta-row-assistant .msg-time {
   flex-shrink: 0;
 }
+
 .msg-model-name {
   flex: 1;
   min-width: 0;
@@ -1056,6 +1116,7 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   text-align: left;
 }
+
 .msg-share-btn,
 .msg-copy-btn,
 .msg-export-img-btn,
@@ -1068,6 +1129,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--n-primary-color);
   transition: color 0.2s, border-color 0.2s, background-color 0.2s;
 }
+
 .msg-share-btn:hover,
 .msg-copy-btn:hover,
 .msg-export-img-btn:hover,
@@ -1076,6 +1138,7 @@ onBeforeUnmount(() => {
   background-color: var(--n-primary-color);
   color: #fff;
 }
+
 .message-item.user .msg-bubble .msg-share-btn,
 .message-item.user .msg-bubble .msg-copy-btn,
 .message-item.user .msg-bubble .msg-export-img-btn,
@@ -1084,6 +1147,7 @@ onBeforeUnmount(() => {
   background-color: rgba(255, 255, 255, 0.22);
   border-color: rgba(255, 255, 255, 0.65);
 }
+
 .message-item.user .msg-bubble .msg-share-btn:hover,
 .message-item.user .msg-bubble .msg-copy-btn:hover,
 .message-item.user .msg-bubble .msg-export-img-btn:hover,
@@ -1092,19 +1156,23 @@ onBeforeUnmount(() => {
   border-color: rgba(255, 255, 255, 0.95);
   background-color: rgba(255, 255, 255, 0.32);
 }
+
 .msg-content .msg-markdown {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
 }
+
 .msg-content .msg-markdown :deep(.md-editor-preview) {
   font-size: 13px;
   line-height: 1.6;
 }
+
 .message-item.user .msg-content :deep(.md-editor-preview),
 .message-item.user .msg-content :deep(.md-editor-preview-wrapper) {
   color: inherit;
 }
+
 .msg-loading {
   display: flex;
   align-items: center;
@@ -1120,11 +1188,13 @@ onBeforeUnmount(() => {
   color: var(--n-text-color-3);
   display: flex;
 }
+
 .msg-meta-user-inner {
   justify-content: flex-end;
   margin-top: 6px;
   margin-bottom: 0;
 }
+
 .message-item.user .msg-meta-user-inner {
   color: rgba(255, 255, 255, 0.78);
 }
@@ -1138,61 +1208,76 @@ onBeforeUnmount(() => {
   gap: 8px;
   background: var(--n-color-modal);
 }
+
 .chat-footer-row {
   display: flex;
   align-items: center;
   gap: 12px;
 }
+
 .chat-footer-select {
   flex: 1;
   min-width: 0;
 }
+
 .chat-footer-select .n-select {
   width: 100%;
 }
+
 .chat-footer-prompt {
   flex: 0 0 120px;
   min-width: 0;
 }
+
 .chat-footer-prompt .n-select {
   width: 100%;
 }
+
 .chat-footer-thinking {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
 }
+
 .chat-footer-thinking-label {
   font-size: 12px;
   color: var(--n-text-color-2);
 }
+
 .chat-footer-memory {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
 }
+
 .chat-footer-memory-count {
   width: 80px;
 }
+
 .chat-footer-memory-count .n-select {
   width: 100%;
 }
+
 .chat-footer-input {
   display: flex;
   gap: 8px;
   align-items: flex-end;
 }
+
 .chat-footer-input .n-input {
   flex: 1;
 }
+
 .chat-footer-input .n-input :deep(textarea) {
   text-align: left;
 }
+
 .chat-footer-input .n-button {
   flex-shrink: 0;
 }
+
 .chat-footer-abort {
   color: #f97316;
 }
@@ -1201,6 +1286,7 @@ onBeforeUnmount(() => {
 .fade-leave-active {
   transition: opacity 0.2s;
 }
+
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
@@ -1210,22 +1296,27 @@ onBeforeUnmount(() => {
 .drawer-slide-leave-active .drawer-mask {
   transition: opacity 0.25s ease;
 }
+
 .drawer-slide-enter-active .drawer-panel,
 .drawer-slide-leave-active .drawer-panel {
   transition: transform 0.25s ease;
 }
+
 .drawer-slide-enter-from .drawer-mask,
 .drawer-slide-leave-to .drawer-mask {
   opacity: 0;
 }
+
 .drawer-slide-enter-from .drawer-panel,
 .drawer-slide-leave-to .drawer-panel {
   transform: translateX(100%);
 }
+
 .drawer-slide-enter-to .drawer-mask,
 .drawer-slide-leave-from .drawer-mask {
   opacity: 1;
 }
+
 .drawer-slide-enter-to .drawer-panel,
 .drawer-slide-leave-from .drawer-panel {
   transform: translateX(0);
