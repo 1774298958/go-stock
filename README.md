@@ -6,6 +6,32 @@
 
 [//]: # ([![star]&#40;https://gitcode.com/ArvinLovegood/go-stock/star/badge.svg&#41;]&#40;https://gitcode.com/ArvinLovegood/go-stock&#41;)
 
+## 💖 赞助商 (Sponsors)
+### 🌟[Anspire开放平台](https://open.anspire.cn/?share_code=OMSTE9LW)，一Key同时启用全球热门大模型和联网搜索，无需科学上网，含免费额度
+[![Anspire开放平台](build/screenshot/anspire-ai.png)](https://open.anspire.cn/?share_code=OMSTE9LW)
+
+<table>
+<tr>
+<td width="180">
+<a href="https://open.anspire.cn/?share_code=OMSTE9LW">
+<img src="build/screenshot/anspireLogo.png" alt="Anspire" width="150">
+</a>
+</td>
+<td>
+感谢 <a href="https://open.anspire.cn/?share_code=OMSTE9LW">Anspire开放平台</a> 赞助了本项目！安思派AI服务平台(Anspire Open)是面向智能体时代的领先的基础设施提供商，现已上线AI联网搜索、AI模型服务、OpenClaw部署、无忧养虾服务。新用户立赠2500点，可体验平台下的任意产品。</td>
+</tr>
+<tr>
+<td width="180">
+<a href="https://www.compshare.cn/?ytag=GPU_YY_YX_git_go-stock">
+<img src="build/screenshot/uclound.png" alt="UCloud" width="150">
+</a>
+</td>
+<td>
+感谢 <a href="https://www.compshare.cn/?ytag=GPU_YY_YX_git_go-stock">优云智算</a> 赞助了本项目！优云智算是UCloud旗下AI云平台，主打包月、按次的高性价比 国模Agent Plan套餐，同时提供官转稳定海外模型。支持接入 Claude Code、Codex 及 API 调用。支持企业高并发、7*24技术支持、自助开票。通过此链接注册的用户，可得免费5元平台体验金！        
+</td>
+</tr>
+</table>
+
 ### 🌟公众号
 ![扫码_搜索联合传播样式-白色版.png](build/screenshot/%E6%89%AB%E7%A0%81_%E6%90%9C%E7%B4%A2%E8%81%94%E5%90%88%E4%BC%A0%E6%92%AD%E6%A0%B7%E5%BC%8F-%E7%99%BD%E8%89%B2%E7%89%88.png)
 
@@ -13,6 +39,8 @@
 
 [//]: # (- QQ交流群2：[点击链接加入群聊【go-stock交流群2】：892666282]&#40;https://qm.qq.com/q/5mYiy6Yxh0&#41;)
 - QQ交流群：[点击链接加入群聊【go-stock交流群】：491605333(定期清理，随缘入群)](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=0YQ8qD3exahsD4YLNhzQTWe5ssstWC89&authKey=usOMMRFtIQDC%2FYcatHYapcxQbJ7PwXPHK9OypTXWzNjAq%2FRVvQu9bj2lRgb%2BSZ3p&noverify=0&group_code=491605333)
+- 硅基流动(siliconflow)，注册即送2000万Tokens，[注册链接](https://cloud.siliconflow.cn/i/foufCerk)
+
 
 ###  ✨ 简介
 - 本项目基于Wails和NaiveUI开发，结合AI大模型构建的股票分析工具。
@@ -45,7 +73,6 @@
 ### <span style="color: #568DF4;">各位亲爱的朋友们，如果您对这个项目感兴趣，请先给我一个<i style="color: #EA2626;">star</i>吧，谢谢！</span>💕
 [//]: # (- 优云智算（by UCloud）：万卡规模4090免费用10小时，新人注册另增50万tokens，海量热门源项目镜像一键部署，[注册链接]&#40;https://www.compshare.cn/image-community?ytag=GPU_YY-gh_gostock&#41;)
 - 火山方舟：新用户每个模型注册即送50万tokens，[注册链接](https://www.volcengine.com/experience/ark?utm_term=202502dsinvite&ac=DSASUQY5&rc=IJSE43PZ)
-- 硅基流动(siliconflow)，注册即送2000万Tokens，[注册链接](https://cloud.siliconflow.cn/i/foufCerk)
 
 [//]: # (- Tushare大数据开放社区,免费提供各类金融数据,助力行业和量化研究&#40;注意：Tushare只需要120积分即可，注册完成个人资料补充即可得120积分！！！&#41;，[注册链接]&#40;https://tushare.pro/register?reg=701944&#41;)
 - 软件快速迭代开发中,请大家优先测试和使用最新发布的版本。
@@ -63,7 +90,7 @@
 ## 🧩 重大功能开发计划
 | 功能说明            | 状态 | 备注                                                                                                       |
 |-----------------|----|----------------------------------------------------------------------------------------------------------|
-| 股票分析知识库         | 🚧 | 未来计划                                                                                                     |
+| 股票分析知识库         | 🚧 | 未来计划  (研究中心已有体现)                                                                                         |
 | Ai智能选股          | ✅  | Ai智能选股功能(市场行情-》AI总结/AI智能体功能)                                                                             |
 | ETF支持           | 🚧 | ETF数据支持 (目前可以查看净值和估值)                                                                                    |
 | 美股支持            | ✅  | 美股数据支持                                                                                                   |
@@ -73,6 +100,10 @@
 | 不再强制依赖Chrome浏览器 | ✅  | 默认使用edge浏览器抓取新闻资讯                                                                                        |
 
 ## 👀 更新日志
+### 2026.04.12 引入AgentMode类型支持React和PlanExecute两种代理模式
+### 2026.04.11 引入MCP工具调用支持支持
+### 2026.04.04 添加节假日工具支持
+### 2026.04.03 添加节股票异动数据(A股当日)
 ### 2026.03.10 新增AI助手功能
 ### 2026.02.08 完善AI推荐股票功能和数据查询功能
 ### 2026.01.25 添加AI分析报告和ai推荐股票的历史数据查看功能
@@ -164,11 +195,6 @@
 - [Vite](https://vitejs.dev/)
 - [Tushare](https://tushare.pro/register?reg=701944)
 
-## 😘 赞助我
-### 都划到这了，如果我的项目对您有帮助，请赞助我吧！😊😊😊
-| 支付宝 | 微信  |
-|-----|-----| 
-| ![alipay.jpg](build/screenshot/alipay.jpg)  | ![wxpay.jpg](build/screenshot/wxpay.jpg) |
 
 
 ## ⭐ Star History

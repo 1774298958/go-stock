@@ -13,6 +13,7 @@ import (
 	"go-stock/backend/data"
 	"go-stock/backend/db"
 	"go-stock/backend/logger"
+	"go-stock/backend/machineid"
 	"go-stock/backend/models"
 	"os"
 	"path/filepath"
@@ -31,7 +32,6 @@ import (
 	"github.com/duke-git/lancet/v2/mathutil"
 	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/strutil"
-	"github.com/go-resty/resty/v2"
 	"github.com/robfig/cron/v3"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -59,7 +59,7 @@ type App struct {
 func NewApp() *App {
 	cacheSize := 512 * 1024
 	cache := freecache.NewCache(cacheSize)
-	c := cron.New(cron.WithSeconds())
+	c := cron.New(cron.WithSeconds(), cron.WithChain(cron.Recover(cron.DefaultLogger)))
 	c.Start()
 	var tools []data.Tool
 	tools = data.Tools(tools)
@@ -102,6 +102,60 @@ func (a *App) GetEffectiveSponsorVip() map[string]any {
 	return map[string]any{
 		"vipLevel": level,
 		"active":   active,
+	}
+}
+
+func (a *App) GetMachineId() string {
+	return machineid.GetMachineId()
+}
+
+func (a *App) CheckDeviceBinding(token string, apiBase string) map[string]any {
+	uuid := machineid.GetMachineId()
+	result := map[string]any{
+		"bound":       false,
+		"deviceCount": 0,
+		"maxDevices":  5,
+	}
+
+	if token == "" || apiBase == "" {
+		return result
+	}
+
+	url := fmt.Sprintf("%s/user/device-check?uuid=%s", apiBase, uuid)
+	resp, err := data.SharedHTTPClient.R().
+		SetHeader("Authorization", "Bearer "+token).
+		Get(url)
+	if err != nil {
+		return result
+	}
+
+	var respData struct {
+		Code int `json:"code"`
+		Data struct {
+			Bound       bool `json:"bound"`
+			DeviceCount int  `json:"deviceCount"`
+			MaxDevices  int  `json:"maxDevices"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(resp.Body(), &respData); err != nil {
+		return result
+	}
+	if respData.Code != 0 {
+		return result
+	}
+
+	result["bound"] = respData.Data.Bound
+	result["deviceCount"] = respData.Data.DeviceCount
+	result["maxDevices"] = respData.Data.MaxDevices
+	return result
+}
+
+func (a *App) QuitApp() {
+	if a.ctx != nil {
+		if a.cron != nil {
+			a.cron.Stop()
+		}
+		runtime.Quit(a.ctx)
 	}
 }
 func (a *App) CheckSponsorCode(sponsorCode string) map[string]any {
@@ -168,13 +222,47 @@ func (a *App) CheckUpdate(flag int) {
 		}
 	}
 
+	updateChannel := a.GetConfig().UpdateChannel
+	if updateChannel == "" {
+		updateChannel = "release"
+	}
+
 	releaseVersion := &models.GitHubReleaseVersion{}
-	_, err := resty.New().R().
-		SetResult(releaseVersion).
-		Get("https://api.github.com/repos/ArvinLovegood/go-stock/releases/latest")
-	if err != nil {
-		logger.SugaredLogger.Errorf("get github release version error:%s", err.Error())
-		return
+	var err error
+	if updateChannel == "release" {
+		_, err = data.SharedHTTPClient.R().
+			SetResult(releaseVersion).
+			Get("https://api.github.com/repos/ArvinLovegood/go-stock/releases/latest")
+		if err != nil {
+			logger.SugaredLogger.Errorf("get github release version error:%s", err.Error())
+			return
+		}
+	} else {
+		var releases []models.GitHubReleaseVersion
+		_, err = data.SharedHTTPClient.R().
+			SetResult(&releases).
+			Get("https://api.github.com/repos/ArvinLovegood/go-stock/releases")
+		if err != nil {
+			logger.SugaredLogger.Errorf("get github releases error:%s", err.Error())
+			return
+		}
+		if len(releases) == 0 {
+			logger.SugaredLogger.Errorf("no releases found")
+			return
+		}
+		if updateChannel == "pre" {
+			for _, r := range releases {
+				if !r.Draft {
+					releaseVersion = &r
+					break
+				}
+			}
+			if releaseVersion.TagName == "" {
+				releaseVersion = &releases[0]
+			}
+		} else {
+			releaseVersion = &releases[0]
+		}
 	}
 	//logger.SugaredLogger.Infof("releaseVersion:%+v", releaseVersion.TagName)
 
@@ -188,7 +276,7 @@ func (a *App) CheckUpdate(flag int) {
 
 	if releaseVersion.TagName != Version {
 		tag := &models.Tag{}
-		_, err = resty.New().R().
+		_, err = data.SharedHTTPClient.R().
 			SetResult(tag).
 			Get("https://api.github.com/repos/ArvinLovegood/go-stock/git/ref/tags/" + releaseVersion.TagName)
 		if err == nil {
@@ -196,7 +284,7 @@ func (a *App) CheckUpdate(flag int) {
 		}
 
 		commit := &models.Commit{}
-		_, err = resty.New().R().
+		_, err = data.SharedHTTPClient.R().
 			SetResult(commit).
 			Get(tag.Object.Url)
 		if err == nil {
@@ -220,7 +308,7 @@ func (a *App) CheckUpdate(flag int) {
 			"source":  "go-stock",
 			"content": fmt.Sprintf("%s", commit.Message),
 		})
-		resp, err := resty.New().R().Get(downloadUrl)
+		resp, err := data.SharedHTTPClient.R().Get(downloadUrl)
 		if err != nil {
 			go runtime.EventsEmit(a.ctx, "newsPush", map[string]any{
 				"time":    "新版本：" + releaseVersion.TagName,
@@ -342,7 +430,7 @@ func (a *App) isVip(sponsorCode string, downloadUrl string, releaseVersion *mode
 
 func (a *App) syncNews() {
 	defer PanicHandler()
-	client := resty.New()
+	client := data.SharedHTTPClient
 	url := fmt.Sprintf("http://go-stock.sparkmemory.top:16666/FinancialNews/json?since=%d", time.Now().Add(-24*time.Hour).Unix())
 	//logger.SugaredLogger.Infof("syncNews:%s", url)
 	resp, err := client.R().SetDoNotParseResponse(true).Get(url)
@@ -475,7 +563,7 @@ func (a *App) domReady(ctx context.Context) {
 		entryID, err := a.cron.AddFunc(fmt.Sprintf("@every %ds", interval+10), func() {
 			//news := data.NewMarketNewsApi().GetNewTelegraph(30)
 			news := data.NewMarketNewsApi().TelegraphList(30)
-			if config.EnablePushNews {
+			if data.GetSettingConfig().EnablePushNews {
 				go a.NewsPush(news)
 			}
 			go runtime.EventsEmit(a.ctx, "newTelegraph", news)
@@ -488,7 +576,7 @@ func (a *App) domReady(ctx context.Context) {
 
 		entryIDSina, err := a.cron.AddFunc(fmt.Sprintf("@every %ds", interval+10), func() {
 			news := data.NewMarketNewsApi().GetSinaNews(30)
-			if config.EnablePushNews {
+			if data.GetSettingConfig().EnablePushNews {
 				go a.NewsPush(news)
 			}
 			go runtime.EventsEmit(a.ctx, "newSinaNews", news)
@@ -501,7 +589,7 @@ func (a *App) domReady(ctx context.Context) {
 
 		entryIDTradingViewNews, err := a.cron.AddFunc(fmt.Sprintf("@every %ds", interval+10), func() {
 			news := data.NewMarketNewsApi().TradingViewNews()
-			if config.EnablePushNews {
+			if data.GetSettingConfig().EnablePushNews {
 				go a.NewsPush(news)
 			}
 			go runtime.EventsEmit(a.ctx, "tradingViewNews", news)
@@ -589,6 +677,18 @@ func (a *App) domReady(ctx context.Context) {
 	go MonitorAiRecommendStockPrices(a)
 	// 自选股成本价监控
 	go MonitorFollowedStockCostPrices(a)
+	// 市场统计数据采集（交易日每5分钟）
+	go func() {
+		a.FetchAndSaveMarketStatistic()
+		idMarketStat, err := a.cron.AddFunc("0 */5 9-15 * * 1-5", func() {
+			a.FetchAndSaveMarketStatistic()
+		})
+		if err != nil {
+			logger.SugaredLogger.Errorf("AddFunc FetchAndSaveMarketStatistic error:%s", err.Error())
+		} else {
+			a.setCronEntry("FetchAndSaveMarketStatistic", idMarketStat)
+		}
+	}()
 	//检查新版本
 	go func() {
 		a.CheckUpdate(0)
@@ -665,7 +765,7 @@ func (a *App) CheckStockBaseInfo(ctx context.Context) {
 		go runtime.EventsEmit(ctx, "loadingMsg", "done")
 	}()
 	stockBasics := &[]data.StockBasic{}
-	resty.New().R().
+	data.SharedHTTPClient.R().
 		SetHeader("user", "go-stock").
 		SetResult(stockBasics).
 		Get("http://8.134.249.145:18080/go-stock/stock_basic.json")
@@ -698,7 +798,7 @@ func (a *App) CheckStockBaseInfo(ctx context.Context) {
 	//}
 
 	stockHKBasics := &[]models.StockInfoHK{}
-	resty.New().R().
+	data.SharedHTTPClient.R().
 		SetHeader("user", "go-stock").
 		SetResult(stockHKBasics).
 		Get("http://8.134.249.145:18080/go-stock/stock_base_info_hk.json")
@@ -724,7 +824,7 @@ func (a *App) CheckStockBaseInfo(ctx context.Context) {
 	//	}
 	//}
 	stockUSBasics := &[]models.StockInfoUS{}
-	resty.New().R().
+	data.SharedHTTPClient.R().
 		SetHeader("user", "go-stock").
 		SetResult(stockUSBasics).
 		Get("http://8.134.249.145:18080/go-stock/stock_base_info_us.json")
@@ -774,23 +874,24 @@ func (a *App) AddCronTask(follow data.FollowedStock) func() {
 	return func() {
 		go runtime.EventsEmit(a.ctx, "warnMsg", "开始自动分析"+follow.Name+"_"+follow.StockCode)
 		ai := data.NewDeepSeekOpenAi(a.ctx, follow.AiConfigId)
-		msgs := ai.NewChatStream(follow.Name, follow.StockCode, "", nil, a.AiTools, true)
+		thinking := data.GetSettingConfig().GetAIConfigThinking(follow.AiConfigId)
+		msgs := ai.NewChatStream(follow.Name, follow.StockCode, "", nil, a.AiTools, thinking)
 		var res strings.Builder
 
 		chatId := ""
 		question := ""
 		for msg := range msgs {
-			if msg["extraContent"] != nil {
-				res.WriteString(msg["extraContent"].(string) + "\n")
+			if v, ok := msg["extraContent"].(string); ok && v != "" {
+				res.WriteString(v + "\n")
 			}
-			if msg["content"] != nil {
-				res.WriteString(msg["content"].(string))
+			if v, ok := msg["content"].(string); ok && v != "" {
+				res.WriteString(v)
 			}
-			if msg["chatId"] != nil {
-				chatId = msg["chatId"].(string)
+			if v, ok := msg["chatId"].(string); ok {
+				chatId = v
 			}
-			if msg["question"] != nil {
-				question = msg["question"].(string)
+			if v, ok := msg["question"].(string); ok {
+				question = v
 			}
 		}
 
@@ -802,7 +903,7 @@ func (a *App) AddCronTask(follow data.FollowedStock) func() {
 
 func refreshTelegraphList() *[]string {
 	url := "https://www.cls.cn/telegraph"
-	response, err := resty.New().R().
+	response, err := data.SharedHTTPClient.R().
 		SetHeader("Referer", "https://www.cls.cn/").
 		SetHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36 Edg/117.0.2045.60").
 		Get(url)
@@ -823,15 +924,80 @@ func refreshTelegraphList() *[]string {
 }
 
 // isTradingDay 判断是否是交易日
+var tradingDayCache = freecache.NewCache(64 * 1024)
+
 func isTradingDay(date time.Time) bool {
 	weekday := date.Weekday()
-	// 判断是否是周末
+	dateStr := date.Format("2006-01-02")
+
+	cacheKey := []byte(dateStr)
+	if cached, err := tradingDayCache.Get(cacheKey); err == nil {
+		return string(cached) == "1"
+	}
+
 	if weekday == time.Saturday || weekday == time.Sunday {
+		_ = tradingDayCache.Set(cacheKey, []byte("0"), 86400)
 		return false
 	}
-	// 这里可以添加具体的节假日判断逻辑
-	// 例如：判断是否是春节、国庆节等
+
+	isHoliday, apiOk := checkHolidayAPI(dateStr)
+	if apiOk {
+		if isHoliday {
+			_ = tradingDayCache.Set(cacheKey, []byte("0"), 86400)
+			return false
+		}
+		_ = tradingDayCache.Set(cacheKey, []byte("1"), 86400)
+		return true
+	}
+
+	_ = tradingDayCache.Set(cacheKey, []byte("1"), 600)
 	return true
+}
+
+func checkHolidayAPI(date string) (isHoliday bool, apiOk bool) {
+	type holidayResp struct {
+		Code    int `json:"code"`
+		Holiday struct {
+			Holiday bool   `json:"holiday"`
+			Name    string `json:"name"`
+		} `json:"holiday"`
+	}
+	var result holidayResp
+	resp, err := data.SharedHTTPClient.R().SetResult(&result).Get(fmt.Sprintf("https://timor.tech/api/holiday/info/%s", date))
+	if err != nil || resp.StatusCode() != 200 {
+		return false, false
+	}
+	if result.Code == 0 && result.Holiday.Holiday {
+		return true, true
+	}
+	return false, true
+}
+
+func preCacheTradingDays() {
+	loc, _ := time.LoadLocation("Asia/Shanghai")
+	now := time.Now().In(loc)
+	go func() {
+		for i := -7; i <= 7; i++ {
+			d := now.AddDate(0, 0, i)
+			isTradingDay(d)
+		}
+	}()
+	go func() {
+		for i := -7; i <= 7; i++ {
+			d := now.AddDate(0, 0, i)
+			isHKTradingDay(d)
+		}
+	}()
+	go func() {
+		est, _ := time.LoadLocation("America/New_York")
+		for i := -7; i <= 7; i++ {
+			d := now.AddDate(0, 0, i)
+			if est != nil {
+				d = d.In(est)
+			}
+			isUSTradingDay(d)
+		}
+	}()
 }
 
 // isTradingTime 判断是否是交易时间
@@ -857,67 +1023,150 @@ func isTradingTime(date time.Time) bool {
 
 // IsHKTradingTime 判断当前时间是否在港股交易时间内
 func IsHKTradingTime(date time.Time) bool {
+	if !isHKTradingDay(date) {
+		return false
+	}
+
 	hour, minute, _ := date.Clock()
 
-	// 开市前竞价时段：09:00 - 09:30
 	if (hour == 9 && minute >= 0) || (hour == 9 && minute <= 30) {
 		return true
 	}
 
-	// 上午持续交易时段：09:30 - 12:00
 	if (hour == 9 && minute > 30) || (hour >= 10 && hour < 12) || (hour == 12 && minute == 0) {
 		return true
 	}
 
-	// 下午持续交易时段：13:00 - 16:00
 	if (hour == 13 && minute >= 0) || (hour >= 14 && hour < 16) || (hour == 16 && minute == 0) {
 		return true
 	}
 
-	// 收市竞价交易时段：16:00 - 16:10
 	if (hour == 16 && minute >= 0) || (hour == 16 && minute <= 10) {
 		return true
 	}
 	return false
 }
 
+func isHKTradingDay(date time.Time) bool {
+	weekday := date.Weekday()
+	dateStr := date.Format("2006-01-02")
+
+	cacheKey := []byte("hk:" + dateStr)
+	if cached, err := tradingDayCache.Get(cacheKey); err == nil {
+		return string(cached) == "1"
+	}
+
+	if weekday == time.Saturday || weekday == time.Sunday {
+		_ = tradingDayCache.Set(cacheKey, []byte("0"), 86400)
+		return false
+	}
+
+	isHoliday, apiOk := checkHKHolidayAPI(dateStr)
+	if apiOk {
+		if isHoliday {
+			_ = tradingDayCache.Set(cacheKey, []byte("0"), 86400)
+			return false
+		}
+		_ = tradingDayCache.Set(cacheKey, []byte("1"), 86400)
+		return true
+	}
+
+	_ = tradingDayCache.Set(cacheKey, []byte("1"), 600)
+	return true
+}
+
+func checkHKHolidayAPI(date string) (isHoliday bool, apiOk bool) {
+	type klineResp struct {
+		Data struct {
+			Klines []string `json:"klines"`
+		} `json:"data"`
+	}
+	var result klineResp
+	dateClean := strings.ReplaceAll(date, "-", "")
+	apiURL := fmt.Sprintf("https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=100.HSI&fields1=f1&fields2=f51&klt=101&fqt=0&beg=%s&end=%s", dateClean, dateClean)
+	resp, err := data.SharedHTTPClient.R().SetResult(&result).Get(apiURL)
+	if err != nil || resp.StatusCode() != 200 {
+		return false, false
+	}
+	if result.Data.Klines != nil && len(result.Data.Klines) > 0 {
+		return false, true
+	}
+	return true, true
+}
+
 // IsUSTradingTime 判断当前时间是否在美股交易时间内
 func IsUSTradingTime(date time.Time) bool {
-	// 获取美国东部时区
 	est, err := time.LoadLocation("America/New_York")
 	var estTime time.Time
 	if err != nil {
 		estTime = date.Add(time.Hour * -12)
 	} else {
-		// 将当前时间转换为美国东部时间
 		estTime = date.In(est)
 	}
 
-	// 判断是否是周末
-	weekday := estTime.Weekday()
-	if weekday == time.Saturday || weekday == time.Sunday {
+	if !isUSTradingDay(estTime) {
 		return false
 	}
 
-	// 获取小时和分钟
 	hour, minute, _ := estTime.Clock()
 
-	// 判断是否在4:00 AM到9:30 AM之间（盘前）
 	if (hour == 4) || (hour == 5) || (hour == 6) || (hour == 7) || (hour == 8) || (hour == 9 && minute < 30) {
 		return true
 	}
 
-	// 判断是否在9:30 AM到4:00 PM之间（盘中）
 	if (hour == 9 && minute >= 30) || (hour >= 10 && hour < 16) || (hour == 16 && minute == 0) {
 		return true
 	}
 
-	// 判断是否在4:00 PM到8:00 PM之间（盘后）
 	if (hour == 16 && minute > 0) || (hour >= 17 && hour < 20) || (hour == 20 && minute == 0) {
 		return true
 	}
 
 	return false
+}
+
+func isUSTradingDay(estTime time.Time) bool {
+	weekday := estTime.Weekday()
+	dateStr := estTime.Format("2006-01-02")
+
+	cacheKey := []byte("us:" + dateStr)
+	if cached, err := tradingDayCache.Get(cacheKey); err == nil {
+		return string(cached) == "1"
+	}
+
+	if weekday == time.Saturday || weekday == time.Sunday {
+		_ = tradingDayCache.Set(cacheKey, []byte("0"), 86400)
+		return false
+	}
+
+	isHoliday, apiOk := checkUSHolidayAPI(dateStr)
+	if apiOk {
+		if isHoliday {
+			_ = tradingDayCache.Set(cacheKey, []byte("0"), 86400)
+			return false
+		}
+		_ = tradingDayCache.Set(cacheKey, []byte("1"), 86400)
+		return true
+	}
+
+	_ = tradingDayCache.Set(cacheKey, []byte("1"), 600)
+	return true
+}
+
+func checkUSHolidayAPI(date string) (isHoliday bool, apiOk bool) {
+	type usHolidayResp struct {
+		IsHoliday    bool   `json:"is_holiday"`
+		IsEarlyClose bool   `json:"is_early_close"`
+		IsWeekend    bool   `json:"is_weekend"`
+		Status       string `json:"status"`
+	}
+	var result usHolidayResp
+	apiURL := fmt.Sprintf("https://fincalapi.com/v1/day_status?calendar=NYSE&date=%s", date)
+	resp, err := data.SharedHTTPClient.R().SetResult(&result).Get(apiURL)
+	if err != nil || resp.StatusCode() != 200 {
+		return false, false
+	}
+	return result.IsHoliday, true
 }
 func MonitorFundPrices(a *App) {
 	// 检查 A 股是否开市（基金交易时间与 A 股一致）
@@ -1230,7 +1479,10 @@ func GetStockInfos(follows ...data.FollowedStock) *[]data.StockInfo {
 		}
 		stockCodes = append(stockCodes, follow.StockCode)
 	}
-	stockData, _ := data.NewStockDataApi().GetStockCodeRealTimeData(stockCodes...)
+	stockData, err := data.NewStockDataApi().GetStockCodeRealTimeData(stockCodes...)
+	if err != nil || stockData == nil {
+		return &stockInfos
+	}
 	for _, info := range *stockData {
 		v, ok := slice.FindBy(follows, func(idx int, follow data.FollowedStock) bool {
 			if strutil.HasPrefixAny(follow.StockCode, []string{"US", "us"}) {
@@ -1249,7 +1501,7 @@ func GetStockInfos(follows ...data.FollowedStock) *[]data.StockInfo {
 func getStockInfo(follow data.FollowedStock) *data.StockInfo {
 	stockCode := follow.StockCode
 	stockDatas, err := data.NewStockDataApi().GetStockCodeRealTimeData(stockCode)
-	if err != nil || len(*stockDatas) == 0 {
+	if err != nil || stockDatas == nil || len(*stockDatas) == 0 {
 		return &data.StockInfo{}
 	}
 	stockData := (*stockDatas)[0]
@@ -1472,6 +1724,10 @@ func (a *App) GetVersionInfo() *models.VersionInfo {
 	}
 }
 
+func (a *App) GetUserManual() string {
+	return string(userManual)
+}
+
 //// checkChromeOnWindows 在 Windows 系统上检查谷歌浏览器是否安装
 //func checkChromeOnWindows() bool {
 //	key, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe`, registry.QUERY_VALUE)
@@ -1615,7 +1871,7 @@ func (a *App) ShareAnalysis(stockCode, stockName string) string {
 	if res != nil && len(res.Content) > 100 {
 		analysisTime := res.CreatedAt.Format("2006/01/02")
 		//logger.SugaredLogger.Infof("%s analysisTime:%s", res.CreatedAt, analysisTime)
-		response, err := resty.New().SetHeader("ua-x", "go-stock").R().SetFormData(map[string]string{
+		response, err := data.SharedHTTPClient.R().SetHeader("ua-x", "go-stock").SetFormData(map[string]string{
 			"text":         res.Content,
 			"stockCode":    stockCode,
 			"stockName":    stockName,
@@ -1641,7 +1897,7 @@ func (a *App) ShareText(text, title string) string {
 		title = "AI助手"
 	}
 	analysisTime := time.Now().Format("2006/01/02")
-	response, err := resty.New().SetHeader("ua-x", "go-stock").R().SetFormData(map[string]string{
+	response, err := data.SharedHTTPClient.R().SetHeader("ua-x", "go-stock").SetFormData(map[string]string{
 		"text":         text,
 		"stockCode":    title,
 		"stockName":    title,
@@ -1664,6 +1920,36 @@ func (a *App) FollowFund(fundCode string) string {
 }
 func (a *App) UnFollowFund(fundCode string) string {
 	return data.NewFundApi().UnFollowFund(fundCode)
+}
+func (a *App) GetFundKLine(fundCode string, klt string, limit int) *data.KLineSourceResult {
+	return data.NewFundKLineApi().GetFundKLineWithFallback(fundCode, klt, limit)
+}
+func (a *App) GetFundHistoryNetValue(fundCode string, pageSize int, startDate string, endDate string) []data.FundHistoryNetValue {
+	res, _ := data.NewFundApi().GetFundHistoryNetValue(fundCode, 1, pageSize, startDate, endDate)
+	if res == nil {
+		return []data.FundHistoryNetValue{}
+	}
+	return res
+}
+func (a *App) GetFundTop10Holdings(fundCode string) []data.FundHoldingStock {
+	res, err := data.NewFundApi().GetFundTop10Holdings(fundCode)
+	if err != nil || res == nil {
+		return []data.FundHoldingStock{}
+	}
+	return res
+}
+func (a *App) GetFundRanking(marketType, fundType, sortField, sortOrder string, pageIndex, pageSize int) *data.FundRankingResult {
+	res, err := data.NewFundApi().GetFundRanking(marketType, fundType, sortField, sortOrder, pageIndex, pageSize)
+	if err != nil || res == nil {
+		return &data.FundRankingResult{}
+	}
+	return res
+}
+func (a *App) SearchFundCodes(keyword string) []data.FundSearchItem {
+	return data.NewFundApi().SearchFundCodes(keyword)
+}
+func (a *App) GetFollowedFundPaged(pageIndex, pageSize int, keyword string) *data.FollowedFundPagedResult {
+	return data.NewFundApi().GetFollowedFundPaged(pageIndex, pageSize, keyword)
 }
 func (a *App) SaveAsMarkdown(stockCode, stockName string) string {
 	res := data.NewDeepSeekOpenAi(a.ctx, 0).GetAIResponseResult(stockCode)
@@ -1818,6 +2104,115 @@ func (a *App) GetStockEastMoneyKLinePage(stockCode, stockName string, klt string
 	return api.GetKLineDataBefore(stockCode, klt, "", limit, end)
 }
 
+// GetStockKLineWithFallback 多数据源自动切换 K 线：优先东方财富，不可用时自动切换新浪财经。
+// 返回 KLineSourceResult，包含 data（K 线数组）和 source（实际使用的数据源标识：eastmoney / sina）。
+func (a *App) GetStockKLineWithFallback(stockCode, stockName string, klt string, limit int) *data.KLineSourceResult {
+	if limit <= 0 {
+		limit = 500
+	}
+	if limit > 5000 {
+		limit = 5000
+	}
+	klt = strings.TrimSpace(klt)
+	if klt == "" {
+		klt = "101"
+	}
+	return data.FetchKLineWithFallback(stockCode, stockName, klt, limit, "")
+}
+
+// GetStockKLinePageWithFallback 多数据源自动切换 K 线（分页）：优先东方财富，不可用时自动切换新浪财经。
+// end 参数仅对东方财富有效；新浪数据源不支持分页，将返回最新一段数据。
+func (a *App) GetStockKLinePageWithFallback(stockCode, stockName string, klt string, limit int, end string) *data.KLineSourceResult {
+	if limit <= 0 {
+		limit = 500
+	}
+	if limit > 5000 {
+		limit = 5000
+	}
+	klt = strings.TrimSpace(klt)
+	if klt == "" {
+		klt = "101"
+	}
+	end = strings.TrimSpace(end)
+	return data.FetchKLineWithFallback(stockCode, stockName, klt, limit, end)
+}
+
+// GetChipDistribution 获取/计算股票筹码分布（筹码图）数据（用于前端绘图）。
+// days：近多少个交易日；bins：分箱数量；adjustFlag：""/qfq/hfq
+func (a *App) GetChipDistribution(stockCode string, days int, bins int, adjustFlag string) (*data.ChipDistributionResult, error) {
+	stockCode = strings.TrimSpace(stockCode)
+	if stockCode == "" {
+		return nil, fmt.Errorf("stockCode 不能为空")
+	}
+	if days <= 0 {
+		days = 120
+	}
+	if bins <= 0 {
+		bins = 80
+	}
+	adjustFlag = strings.TrimSpace(strings.ToLower(adjustFlag))
+	if adjustFlag != "" && adjustFlag != "qfq" && adjustFlag != "hfq" {
+		adjustFlag = "qfq"
+	}
+
+	api := data.NewEastMoneyKLineApi(data.GetSettingConfig())
+	if !api.ValidateStockCode(stockCode) {
+		return nil, fmt.Errorf("股票代码无效：%s", stockCode)
+	}
+
+	var kLines *[]data.KLineData
+
+	if adjustFlag != "" {
+		kLines = api.GetKLineData(stockCode, "101", adjustFlag, days)
+	} else {
+		result := data.FetchKLineWithFallback(stockCode, "", "101", days, "")
+		if result != nil && result.Data != nil {
+			kLines = result.Data
+		}
+	}
+
+	if kLines == nil || len(*kLines) == 0 {
+		return nil, fmt.Errorf("未获取到K线数据")
+	}
+	calculator := data.NewChipDistributionCalculator()
+	return calculator.Calculate(stockCode, *kLines, bins)
+}
+
+// GetTdxCallAuction 通过通达信协议获取集合竞价数据。
+// stockCode 格式如 600519.SH、000001.SZ、430047.BJ；start 为起始位置（0=最新）；count 为请求数量（最大 500）。
+func (a *App) GetTdxCallAuction(stockCode string, start uint32, count uint32) *[]data.TdxCallAuctionData {
+	if count <= 0 {
+		count = 500
+	}
+	api := data.NewTdxKLineApi()
+	return api.GetCallAuction(stockCode, start, count)
+}
+
+func (a *App) GetTdxCompanyInfo(stockCode string) *data.TdxCompanyInfoBundle {
+	api := data.NewTdxKLineApi()
+	return api.GetF10Data(stockCode)
+}
+
+func (a *App) GetTdxFinanceInfo(stockCode string) *data.TdxFinanceInfo {
+	api := data.NewTdxKLineApi()
+	return api.GetFinanceInfo(stockCode)
+}
+
+func (a *App) GetTdxXDXRInfo(stockCode string) *[]data.TdxXDXRItem {
+	api := data.NewTdxKLineApi()
+	return api.GetXDXRInfo(stockCode)
+}
+
+func (a *App) GetTdxCompanyCategoryList(stockCode string) *[]data.TdxCompanyCategory {
+	api := data.NewTdxKLineApi()
+	return api.GetF10CategoryList(stockCode)
+}
+
+func (a *App) GetTdxCompanyCategoryContent(stockCode string, categoryName string) *data.TdxCompanyInfoSection {
+	api := data.NewTdxKLineApi()
+	return api.GetF10CategoryContent(stockCode, categoryName)
+}
+
 func (a *App) GetTelegraphList(source string) *[]*models.Telegraph {
 	telegraphs := data.NewMarketNewsApi().GetTelegraphList(source)
 	return telegraphs
@@ -1926,7 +2321,6 @@ func (a *App) OpenURL(url string) {
 //	@param base64Data
 //	@return error
 func (a *App) SaveImage(name, base64Data string) string {
-	// 打开保存文件对话框
 	filePath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "保存图片",
 		DefaultFilename: name + "AI分析.png",
@@ -1941,10 +2335,24 @@ func (a *App) SaveImage(name, base64Data string) string {
 		return "文件路径,无法保存。"
 	}
 
-	// 解码并保存
+	base64Data = strings.ReplaceAll(base64Data, " ", "+")
+	base64Data = strings.ReplaceAll(base64Data, "\n", "")
+	base64Data = strings.ReplaceAll(base64Data, "\r", "")
+	if idx := strings.Index(base64Data, ";base64,"); idx != -1 {
+		base64Data = base64Data[idx+8:]
+	} else if idx := strings.Index(base64Data, "base64,"); idx != -1 {
+		base64Data = base64Data[idx+7:]
+	} else if strings.HasPrefix(base64Data, "data:") {
+		if commaIdx := strings.Index(base64Data, ","); commaIdx != -1 {
+			base64Data = base64Data[commaIdx+1:]
+		}
+	}
 	decodeString, err := base64.StdEncoding.DecodeString(base64Data)
 	if err != nil {
-		return "文件内容异常,无法保存。"
+		decodeString, err = base64.RawStdEncoding.DecodeString(base64Data)
+	}
+	if err != nil {
+		return "文件内容异常,无法保存。" + err.Error()
 	}
 
 	err = os.WriteFile(filepath.Clean(filePath), decodeString, os.ModePerm)
@@ -1962,7 +2370,6 @@ func (a *App) SaveImage(name, base64Data string) string {
 //	@param base64Data
 //	@return error
 func (a *App) SaveWordFile(filename string, base64Data string) string {
-	// 弹出保存文件对话框
 	filePath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "保存 Word 文件",
 		DefaultFilename: filename,
@@ -1974,12 +2381,25 @@ func (a *App) SaveWordFile(filename string, base64Data string) string {
 		return "文件路径,无法保存。"
 	}
 
-	// 解码 base64 内容
+	base64Data = strings.ReplaceAll(base64Data, " ", "+")
+	base64Data = strings.ReplaceAll(base64Data, "\n", "")
+	base64Data = strings.ReplaceAll(base64Data, "\r", "")
+	if idx := strings.Index(base64Data, ";base64,"); idx != -1 {
+		base64Data = base64Data[idx+8:]
+	} else if idx := strings.Index(base64Data, "base64,"); idx != -1 {
+		base64Data = base64Data[idx+7:]
+	} else if strings.HasPrefix(base64Data, "data:") {
+		if commaIdx := strings.Index(base64Data, ","); commaIdx != -1 {
+			base64Data = base64Data[commaIdx+1:]
+		}
+	}
 	decodeString, err := base64.StdEncoding.DecodeString(base64Data)
 	if err != nil {
-		return "文件内容异常,无法保存。"
+		decodeString, err = base64.RawStdEncoding.DecodeString(base64Data)
 	}
-	// 保存为文件
+	if err != nil {
+		return "文件内容异常,无法保存。" + err.Error()
+	}
 	err = os.WriteFile(filepath.Clean(filePath), decodeString, 0777)
 	if err != nil {
 		return "保存结果异常,无法保存。"
@@ -2027,12 +2447,12 @@ func (a *App) FetchAiModels(baseUrl, apiKey string) []string {
 		Data []modelItem `json:"data"`
 	}
 
-	client := resty.New()
+	client := data.SharedHTTPClient
 	client.SetBaseURL(baseUrl)
-	client.SetHeader("Authorization", "Bearer "+apiKey)
-	client.SetHeader("Content-Type", "application/json")
 
 	resp, err := client.R().
+		SetHeader("Authorization", "Bearer "+apiKey).
+		SetHeader("Content-Type", "application/json").
 		SetResult(&respData).
 		Get("/models")
 	if err != nil {
@@ -2053,14 +2473,211 @@ func (a *App) FetchAiModels(baseUrl, apiKey string) []string {
 	return modelsList
 }
 
+type AiModelInfo struct {
+	ModelName string `json:"modelName"`
+	MaxTokens int    `json:"maxTokens"`
+	Source    string `json:"source"`
+}
+
+func (a *App) FetchAiModelInfo(baseUrl, apiKey, modelName string) *AiModelInfo {
+	baseUrl = strutil.Trim(baseUrl)
+	modelName = strutil.Trim(modelName)
+	if baseUrl == "" || modelName == "" {
+		return nil
+	}
+
+	info := &AiModelInfo{
+		ModelName: modelName,
+		MaxTokens: 0,
+		Source:    "",
+	}
+
+	if apiKey != "" {
+		type modelDetail struct {
+			ID             string `json:"id"`
+			MaxContextLen  int    `json:"max_context_length"`
+			ContextLength  int    `json:"context_length"`
+			MaxOutputTok   int    `json:"max_output_tokens"`
+			MaxTokensField int    `json:"max_tokens"`
+		}
+		var detail modelDetail
+
+		client := data.SharedHTTPClient
+		client.SetBaseURL(baseUrl)
+
+		resp, err := client.R().
+			SetHeader("Authorization", "Bearer "+apiKey).
+			SetHeader("Content-Type", "application/json").
+			SetResult(&detail).
+			Get("/models/" + modelName)
+
+		if err == nil && !resp.IsError() && detail.ID != "" {
+			if detail.MaxContextLen > 0 {
+				info.MaxTokens = detail.MaxContextLen
+				info.Source = "api"
+			} else if detail.ContextLength > 0 {
+				info.MaxTokens = detail.ContextLength
+				info.Source = "api"
+			} else if detail.MaxOutputTok > 0 {
+				info.MaxTokens = detail.MaxOutputTok
+				info.Source = "api"
+			} else if detail.MaxTokensField > 0 {
+				info.MaxTokens = detail.MaxTokensField
+				info.Source = "api"
+			}
+		}
+	}
+
+	if info.MaxTokens == 0 {
+		if maxTokens := getBuiltinModelMaxTokens(modelName); maxTokens > 0 {
+			info.MaxTokens = maxTokens
+			info.Source = "builtin"
+		}
+	}
+
+	return info
+}
+
+func getBuiltinModelMaxTokens(modelName string) int {
+	modelTokenMap := map[string]int{
+		"deepseek-chat":        65536,
+		"deepseek-reasoner":    65536,
+		"deepseek-coder":       16384,
+		"deepseek-v3":          65536,
+		"deepseek-r1":          65536,
+		"gpt-4o":               16384,
+		"gpt-4o-mini":          16384,
+		"gpt-4o-2024-05-13":    4096,
+		"gpt-4-turbo":          4096,
+		"gpt-4-turbo-preview":  4096,
+		"gpt-4":                8192,
+		"gpt-4-32k":            32768,
+		"gpt-3.5-turbo":        4096,
+		"gpt-3.5-turbo-16k":    16384,
+		"gpt-4.1":              32768,
+		"gpt-4.1-mini":         32768,
+		"gpt-4.1-nano":         32768,
+		"o1":                   100000,
+		"o1-mini":              65536,
+		"o1-preview":           32768,
+		"o3-mini":              100000,
+		"o4-mini":              100000,
+		"claude-3-5-sonnet":    8192,
+		"claude-3-5-haiku":     8192,
+		"claude-3-opus":        4096,
+		"claude-3-sonnet":      4096,
+		"claude-3-haiku":       4096,
+		"glm-4":                8192,
+		"glm-4-plus":           4096,
+		"glm-4-air":            4096,
+		"glm-4-flash":          4096,
+		"glm-4-long":           4096,
+		"chatglm-turbo":        4096,
+		"moonshot-v1-8k":       8192,
+		"moonshot-v1-32k":      32768,
+		"moonshot-v1-128k":     131072,
+		"qwen-turbo":           8192,
+		"qwen-plus":            131072,
+		"qwen-max":             8192,
+		"qwen-long":            65536,
+		"qwen2.5-72b-instruct": 32768,
+		"hunyuan-lite":         4096,
+		"hunyuan-standard":     4096,
+		"hunyuan-pro":          4096,
+		"hunyuan-turbo":        4096,
+		"spark-lite":           4096,
+		"spark-pro":            4096,
+		"spark-max":            4096,
+		"spark-4.0-ultra":      4096,
+		"yi-light":             16384,
+		"yi-large":             16384,
+		"yi-medium":            16384,
+		"yi-spark":             16384,
+		"yi-vision":            16384,
+		"abab6.5-chat":         8192,
+		"abab6.5s-chat":        8192,
+		"abab5.5-chat":         4096,
+		"baichuan2-turbo":      4096,
+		"baichuan2-53b":        4096,
+		"ernie-4.0":            4096,
+		"ernie-3.5":            4096,
+		"ernie-speed":          4096,
+		"ernie-lite":           4096,
+	}
+
+	if maxTokens, ok := modelTokenMap[modelName]; ok {
+		return maxTokens
+	}
+
+	for prefix, maxTokens := range map[string]int{
+		"deepseek":      65536,
+		"gpt-4o":        16384,
+		"gpt-4-turbo":   4096,
+		"gpt-4-":        8192,
+		"gpt-3.5":       4096,
+		"gpt-4.1":       32768,
+		"o1-":           65536,
+		"o3-":           100000,
+		"o4-":           100000,
+		"claude-3":      8192,
+		"glm-4":         8192,
+		"chatglm":       4096,
+		"moonshot-v1":   8192,
+		"qwen-":         8192,
+		"qwen2":         32768,
+		"hunyuan-":      4096,
+		"spark-":        4096,
+		"yi-":           16384,
+		"abab":          8192,
+		"baichuan":      4096,
+		"ernie-":        4096,
+		"llama-3":       8192,
+		"llama3":        8192,
+		"mistral-":      8192,
+		"mixtral-":      32768,
+		"codestral-":    32768,
+		"gemini-1.5":    8192,
+		"gemini-2":      8192,
+		"command-r":     4096,
+		"Qwen/Qwen":     32768,
+		"deepseek-ai/":  65536,
+		"meta-llama/":   8192,
+		"mistralai/":    32768,
+		"Pro/deepseek-": 65536,
+		"Pro/qwen-":     32768,
+	} {
+		if strings.HasPrefix(modelName, prefix) {
+			return maxTokens
+		}
+	}
+
+	return 0
+}
+
 // InitCronTasks 在应用启动时，自动为启用状态的定时任务创建调度
 func (a *App) InitCronTasks() {
-	tasks := agent.NewCronTaskApi().GetAll()
+	cronApi := agent.NewCronTaskApi()
+	if !cronApi.ExistsByTaskType("stock_change_save") {
+		task := &models.CronTask{
+			Name:        "异动数据保存",
+			CronExpr:    "0 */1 * * * *",
+			TaskType:    "stock_change_save",
+			Enable:      true,
+			Status:      "active",
+			Description: "每分钟自动保存A股异动数据（火箭发射、快速反弹、大笔买入、封涨停板等），交易时间外自动跳过",
+		}
+		err := cronApi.Create(task)
+		if err != nil {
+			logger.SugaredLogger.Errorf("自动创建异动数据保存任务失败：%v", err)
+		} else {
+			logger.SugaredLogger.Info("已自动创建异动数据保存定时任务")
+		}
+	}
+	tasks := cronApi.GetAll()
 	if len(tasks) == 0 {
 		return
 	}
 	for _, t := range tasks {
-		// 避免闭包捕获循环变量
 		taskCopy := t
 		entryID, err := a.cron.AddFunc(taskCopy.CronExpr, func() {
 			err := agent.NewCronTaskApi().ExecuteTask(a.ctx, &taskCopy)
@@ -2074,7 +2691,6 @@ func (a *App) InitCronTasks() {
 			continue
 		}
 		a.setCronEntry(convertor.ToString(taskCopy.ID)+"_"+taskCopy.Name, entryID)
-		//logger.SugaredLogger.Infof("自动创建定时任务成功：%s (ID:%d) entryID:%v", taskCopy.Name, taskCopy.ID, entryID)
 	}
 }
 
@@ -2099,10 +2715,11 @@ func (a *App) CreateCronTask(task *models.CronTask) string {
 	if err != nil {
 		return fmt.Sprintf("创建失败：%v", err)
 	}
-	entryID, err := a.cron.AddFunc(task.CronExpr, func() {
-		err := agent.NewCronTaskApi().ExecuteTask(a.ctx, task)
+	taskCopy := *task
+	entryID, err := a.cron.AddFunc(taskCopy.CronExpr, func() {
+		err := agent.NewCronTaskApi().ExecuteTask(a.ctx, &taskCopy)
 		if err != nil {
-			logger.SugaredLogger.Errorf("执行任务失败：%v %s", err, task.Name)
+			logger.SugaredLogger.Errorf("执行任务失败：%v %s", err, taskCopy.Name)
 			return
 		}
 	})
@@ -2115,13 +2732,17 @@ func (a *App) CreateCronTask(task *models.CronTask) string {
 
 func (a *App) UpdateCronTask(task *models.CronTask) string {
 	err := agent.NewCronTaskApi().Update(task)
+	if err != nil {
+		return fmt.Sprintf("更新失败：%v", err)
+	}
 	if entryID, exists := a.getCronEntry(convertor.ToString(task.ID) + "_" + task.Name); exists {
 		a.cron.Remove(entryID)
 	}
-	entryID, err := a.cron.AddFunc(task.CronExpr, func() {
-		err := agent.NewCronTaskApi().ExecuteTask(a.ctx, task)
+	taskCopy := *task
+	entryID, err := a.cron.AddFunc(taskCopy.CronExpr, func() {
+		err := agent.NewCronTaskApi().ExecuteTask(a.ctx, &taskCopy)
 		if err != nil {
-			logger.SugaredLogger.Errorf("执行任务失败：%v %s", err, task.Name)
+			logger.SugaredLogger.Errorf("执行任务失败：%v %s", err, taskCopy.Name)
 			return
 		}
 	})
@@ -2188,10 +2809,11 @@ func (a *App) EnableCronTask(id uint, enable bool) string {
 			a.cron.Remove(entryID)
 		}
 		if enable {
-			entryID, err := a.cron.AddFunc(task.CronExpr, func() {
-				err := agent.NewCronTaskApi().ExecuteTask(a.ctx, task)
+			taskCopy := *task
+			entryID, err := a.cron.AddFunc(taskCopy.CronExpr, func() {
+				err := agent.NewCronTaskApi().ExecuteTask(a.ctx, &taskCopy)
 				if err != nil {
-					logger.SugaredLogger.Errorf("%s 执行任务失败：%v", task.Name, err)
+					logger.SugaredLogger.Errorf("%s 执行任务失败：%v", taskCopy.Name, err)
 					return
 				}
 			})
@@ -2365,4 +2987,152 @@ func (a *App) CheckFrequentTrading(stockCode string) map[string]any {
 		"canTrade": canTrade,
 		"msg":      msg,
 	}
+}
+
+func (a *App) FetchAndSaveMarketStatistic() {
+	if !isTradingTime(time.Now()) {
+		logger.SugaredLogger.Debugf("当前非交易时间，跳过市场统计数据采集")
+		return
+	}
+	err := data.NewMarketStatisticApi().FetchAndSave()
+	if err != nil {
+		logger.SugaredLogger.Errorf("获取市场统计数据失败: %v", err)
+	}
+}
+
+func (a *App) GetTodayMarketStatistic() []models.MarketStatistic {
+	return data.NewMarketStatisticApi().GetTodayData()
+}
+
+func (a *App) GetMarketStatisticByDate(date string) []models.MarketStatistic {
+	return data.NewMarketStatisticApi().GetByDate(date)
+}
+
+func (a *App) GetRecentDaysMarketStatistic(days int) []models.MarketStatistic {
+	return data.NewMarketStatisticApi().GetRecentDaysData(days)
+}
+
+func (a *App) CreateMCPServer(server *models.MCPServer) string {
+	err := data.NewMCPServerApi().Create(server)
+	if err != nil {
+		logger.SugaredLogger.Errorf("创建MCP服务器失败: %v", err)
+		return "创建失败: " + err.Error()
+	}
+	return "创建成功"
+}
+
+func (a *App) UpdateMCPServer(server *models.MCPServer) string {
+	err := data.NewMCPServerApi().Update(server)
+	if err != nil {
+		logger.SugaredLogger.Errorf("更新MCP服务器失败: %v", err)
+		return "更新失败: " + err.Error()
+	}
+	return "更新成功"
+}
+
+func (a *App) DeleteMCPServer(id uint) string {
+	err := data.NewMCPServerApi().Delete(id)
+	if err != nil {
+		logger.SugaredLogger.Errorf("删除MCP服务器失败: %v", err)
+		return "删除失败: " + err.Error()
+	}
+	return "删除成功"
+}
+
+func (a *App) GetMCPServerByID(id uint) *models.MCPServer {
+	server, err := data.NewMCPServerApi().GetByID(id)
+	if err != nil {
+		logger.SugaredLogger.Errorf("获取MCP服务器失败: %v", err)
+		return nil
+	}
+	return server
+}
+
+func (a *App) GetMCPServerList(query *models.MCPServerQuery) *models.MCPServerPageResp {
+	return data.NewMCPServerApi().List(query)
+}
+
+func (a *App) EnableMCPServer(id uint, enable bool) string {
+	err := data.NewMCPServerApi().EnableServer(id, enable)
+	if err != nil {
+		logger.SugaredLogger.Errorf("启用/禁用MCP服务器失败: %v", err)
+		return "操作失败: " + err.Error()
+	}
+	if enable {
+		return "已启用"
+	}
+	return "已禁用"
+}
+
+func (a *App) TestMCPServer(id uint) string {
+	result, err := data.NewMCPServerApi().TestConnection(id)
+	if err != nil {
+		logger.SugaredLogger.Errorf("测试MCP服务器连接失败: %v", err)
+		return "测试失败: " + err.Error()
+	}
+	return result
+}
+
+func (a *App) CreateSkill(skill *models.Skill) string {
+	err := data.NewSkillApi().Create(skill)
+	if err != nil {
+		logger.SugaredLogger.Errorf("创建技能失败: %v", err)
+		return "创建失败: " + err.Error()
+	}
+	return "创建成功"
+}
+
+func (a *App) UpdateSkill(skill *models.Skill) string {
+	err := data.NewSkillApi().Update(skill)
+	if err != nil {
+		logger.SugaredLogger.Errorf("更新技能失败: %v", err)
+		return "更新失败: " + err.Error()
+	}
+	return "更新成功"
+}
+
+func (a *App) DeleteSkill(id uint) string {
+	err := data.NewSkillApi().Delete(id)
+	if err != nil {
+		logger.SugaredLogger.Errorf("删除技能失败: %v", err)
+		return "删除失败: " + err.Error()
+	}
+	return "删除成功"
+}
+
+func (a *App) GetSkillByID(id uint) *models.Skill {
+	skill, err := data.NewSkillApi().GetByID(id)
+	if err != nil {
+		logger.SugaredLogger.Errorf("获取技能失败: %v", err)
+		return nil
+	}
+	return skill
+}
+
+func (a *App) GetSkillList(query *models.SkillQuery) *models.SkillPageResp {
+	return data.NewSkillApi().List(query)
+}
+
+func (a *App) EnableSkill(id uint, enable bool) string {
+	err := data.NewSkillApi().EnableSkill(id, enable)
+	if err != nil {
+		logger.SugaredLogger.Errorf("启用/禁用技能失败: %v", err)
+		return "操作失败: " + err.Error()
+	}
+	if enable {
+		return "已启用"
+	}
+	return "已禁用"
+}
+
+func (a *App) GetAllSkills() []models.Skill {
+	return data.NewSkillApi().GetAll()
+}
+
+func (a *App) GetMCPToolsByServerID(serverID uint) []models.MCPServerTool {
+	return data.NewMCPServerApi().GetToolsByServerID(serverID)
+}
+
+func (a *App) GetAllMCPTools() []models.MCPServerTool {
+	return data.NewMCPServerApi().GetAllTools()
 }

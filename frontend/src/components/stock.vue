@@ -97,6 +97,7 @@ const handleProgress = (progress) => {
 const enableEditor = ref(false)
 const mdPreviewRef = ref(null)
 const mdEditorRef = ref(null)
+const aiResultScrollRef = ref(null)
 const tipsRef = ref(null)
 const message = useMessage()
 const notify = useNotification()
@@ -126,7 +127,7 @@ const vipLevel = ref(0)
 const klineAutoCloseTimer = ref(null)
 const addBTN = ref(true)
 const enableTools = ref(true)
-const thinkingMode = ref(false)
+const thinkingMode = ref(true)
 const formModel = ref({
   name: "",
   code: "",
@@ -394,11 +395,11 @@ onBeforeMount(() => {
   })
 
   EventsOn("newChatStream", async (msg) => {
-    data.loading = false
     if (msg === "DONE") {
       SaveAIResponseResult(data.code, data.name, data.airesult, data.chatId, data.question, data.aiConfigId)
       message.info("AI分析完成！")
       message.destroyAll()
+      data.loading = false
     } else {
       if (msg.chatId) {
         data.chatId = msg.chatId
@@ -406,13 +407,19 @@ onBeforeMount(() => {
       if (msg.question) {
         data.question = msg.question
       }
+      if (msg.content || msg.reasoning_content || msg.extraContent) {
+        data.loading = false
+      }
       if (msg.content) {
         data.airesult = data.airesult + msg.content
+      }
+      if (msg.reasoning_content) {
+        data.airesult = data.airesult + msg.reasoning_content
       }
       if (msg.extraContent) {
         data.airesult = data.airesult + msg.extraContent
       }
-
+      scrollToAiResultBottom()
     }
   })
 
@@ -426,20 +433,15 @@ onBeforeMount(() => {
 
   EventsOn("updateVersion", async (msg) => {
     const githubTimeStr = msg.published_at;
-    // 创建一个 Date 对象
     const utcDate = new Date(githubTimeStr);
-// 获取本地时间
     const date = new Date(utcDate.getTime());
     const year = date.getFullYear();
-// getMonth 返回值是 0 - 11，所以要加 1
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const hours = String(date.getHours()).padStart(2, '0');
     const minutes = String(date.getMinutes()).padStart(2, '0');
     const seconds = String(date.getSeconds()).padStart(2, '0');
-
     const formattedDate = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-
     notify.info({
       avatar: () =>
           h(NAvatar, {
@@ -449,7 +451,6 @@ onBeforeMount(() => {
           }),
       title: '发现新版本: ' + msg.tag_name,
       content: () => {
-        //return h(MdPreview, {theme:'dark',modelValue:msg.commit?.message}, null)
         return h('div', {
           style: {
             'text-align': 'left',
@@ -1950,41 +1951,73 @@ window.onerror = function (msg, source, lineno, colno, error) {
 };
 
 function saveAsImage(name, code) {
-  Environment().then(env => {
-    switch (env.platform) {
-      case 'windows':
-        const element = document.querySelector('.md-editor-preview');
-        if (element) {
-          html2canvas(element, {
-            useCORS: true, // 解决跨域图片问题
-            scale: 2, // 提高截图质量
-            allowTaint: true, // 允许跨域图片
-          }).then(canvas => {
-            const link = document.createElement('a');
-            link.href = canvas.toDataURL('image/png');
-            link.download = name + "[" + code + ']-ai-analysis-result.png';
-            link.click();
-          });
-        } else {
-          message.error('无法找到分析结果元素');
-        }
-        break
-      default :
-        saveCanvasImage(name)
+  const previewEl = mdPreviewRef.value?.$el || mdEditorRef.value?.$el
+  const element = previewEl?.querySelector('.md-editor-preview-wrapper') ||
+                  previewEl?.querySelector('.md-editor-preview') ||
+                  document.querySelector('.md-editor-preview')
+  if (!element) {
+    message.error('无法找到分析结果元素')
+    return
+  }
+  const savedStyles = []
+  let el = element.parentElement
+  while (el && el !== document.body) {
+    const style = getComputedStyle(el)
+    if (style.overflow === 'hidden' || style.overflowY === 'hidden' || style.overflowY === 'auto' || style.overflowY === 'scroll') {
+      savedStyles.push({ el, overflow: el.style.overflow, overflowY: el.style.overflowY, height: el.style.height, maxHeight: el.style.maxHeight })
+      el.style.overflow = 'visible'
+      el.style.overflowY = 'visible'
+      el.style.height = 'auto'
+      el.style.maxHeight = 'none'
     }
-  })
-}
-
-async function saveCanvasImage(name) {
-  const element = document.querySelector('.md-editor-preview'); // 要截图的 DOM 节点
-  const canvas = await html2canvas(element)
-
-  const dataUrl = canvas.toDataURL('image/png') // base64 格式
-  const base64 = dataUrl.replace(/^data:image\/png;base64,/, '')
-
-  // 调用 Go 后端保存文件（Wails 绑定方法）
-  await SaveImage(name, base64).then(result => {
-    message.success(result)
+    el = el.parentElement
+  }
+  const savedTargetStyle = { height: element.style.height, maxHeight: element.style.maxHeight, overflow: element.style.overflow, overflowY: element.style.overflowY }
+  element.style.height = 'auto'
+  element.style.maxHeight = 'none'
+  element.style.overflow = 'visible'
+  element.style.overflowY = 'visible'
+  nextTick(async () => {
+    const isDark = document.documentElement.getAttribute('theme-mode') === 'dark'
+    try {
+      const canvas = await html2canvas(element, {
+        useCORS: true,
+        scale: 2,
+        allowTaint: true,
+        logging: false,
+        backgroundColor: isDark ? '#1e1e1e' : '#ffffff'
+      })
+      element.style.height = savedTargetStyle.height
+      element.style.maxHeight = savedTargetStyle.maxHeight
+      element.style.overflow = savedTargetStyle.overflow
+      element.style.overflowY = savedTargetStyle.overflowY
+      savedStyles.forEach(({ el, overflow, overflowY, height, maxHeight }) => {
+        el.style.overflow = overflow
+        el.style.overflowY = overflowY
+        el.style.height = height
+        el.style.maxHeight = maxHeight
+      })
+      const dataUrl = canvas.toDataURL('image/png')
+      const base64 = dataUrl.replace(/^data:image\/png;base64,/, '')
+      const result = await SaveImage(name + '[' + code + ']AI分析', base64)
+      if (result && !result.includes('异常') && !result.includes('无法')) {
+        message.success('已导出为 PNG 图片：' + result)
+      } else {
+        message.info(result || '导出取消')
+      }
+    } catch (e) {
+      element.style.height = savedTargetStyle.height
+      element.style.maxHeight = savedTargetStyle.maxHeight
+      element.style.overflow = savedTargetStyle.overflow
+      element.style.overflowY = savedTargetStyle.overflowY
+      savedStyles.forEach(({ el, overflow, overflowY, height, maxHeight }) => {
+        el.style.overflow = overflow
+        el.style.overflowY = overflowY
+        el.style.height = height
+        el.style.maxHeight = maxHeight
+      })
+      message.error('导出图片失败: ' + (e?.message ?? e))
+    }
   })
 }
 
@@ -1995,6 +2028,17 @@ async function copyToClipboard() {
   } catch (err) {
     message.error('复制失败: ' + err);
   }
+}
+
+function scrollToAiResultBottom() {
+  nextTick(() => {
+    requestAnimationFrame(() => {
+      const el = aiResultScrollRef.value
+      if (el) {
+        el.scrollTop = el.scrollHeight
+      }
+    })
+  })
 }
 
 function saveAsMarkdown() {
@@ -2544,7 +2588,7 @@ watch(modalShow6, (newVal) => {
     </n-input-group>
     <!--    </n-card>-->
   </div>
-  <n-modal transform-origin="center" size="small" v-model:show="modalShow" :title="formModel.name" style="width: 800px"
+  <n-modal transform-origin="center" size="small" v-model:show="modalShow" :title="formModel.name" style="width: 800px;max-width: calc(100vw - 32px);"
            :preset="'card'">
     <n-form :model="formModel" :rules="{
               costPrice: { required: true, message: '请输入成本'},
@@ -2660,29 +2704,30 @@ watch(modalShow6, (newVal) => {
       </n-flex>
     </template>
   </n-modal>
-  <n-modal v-model:show="modalShow2" :title="data.name+' '+ data.changePercent+'%'" style="width: 1000px"
+  <n-modal v-model:show="modalShow2" :title="data.name+' '+ data.changePercent+'%'" style="width: 1000px;max-width: calc(100vw - 32px);"
            :preset="'card'" @after-enter="handleFeishi" @after-leave="clearFeishi">
     <!--    <n-image :src="data.fenshiURL" />-->
-    <div ref="kLineChartRef2" style="width: 1000px; height: 500px;"></div>
+    <div ref="kLineChartRef2" style="width: 100%; height: 500px;"></div>
   </n-modal>
-  <n-modal v-model:show="modalShow3" :title="data.name" style="width: 1000px" :preset="'card'"
+  <n-modal v-model:show="modalShow3" :title="data.name" style="width: 1000px;max-width: calc(100vw - 32px);" :preset="'card'"
            @after-enter="handleKLine">
     <!--    <n-image :src="data.kURL" />-->
-    <div ref="kLineChartRef" style="width: 1000px; height: 500px;"></div>
+    <div ref="kLineChartRef" style="width: 100%; height: 500px;"></div>
   </n-modal>
 
-  <n-modal transform-origin="center" v-model:show="modalShow4" preset="card" style="width: 800px;"
+  <n-modal transform-origin="center" v-model:show="modalShow4" preset="card" style="width: 800px;max-width: calc(100vw - 32px);"
            :title="'['+data.name+']AI分析'">
     <n-spin size="small" :show="data.loading">
-      <MdEditor v-if="enableEditor" :toolbars="toolbars" ref="mdEditorRef" style="height: 440px;text-align: left"
+      <MdEditor v-if="enableEditor" :toolbars="toolbars" ref="mdEditorRef" style="height: 440px;max-height: 60vh;text-align: left"
                 :modelValue="data.airesult" :theme="theme">
         <template #defToolbars>
           <ExportPDF :file-name="data.name+'['+data.code+']AI分析报告'" style="text-align: left"
                      :modelValue="data.airesult" @onProgress="handleProgress"/>
         </template>
       </MdEditor>
-      <MdPreview v-if="!enableEditor" ref="mdPreviewRef" style="height: 440px;text-align: left"
-                 :modelValue="data.airesult" :theme="theme"/>
+      <div v-if="!enableEditor" ref="aiResultScrollRef" style="height: 440px;max-height: 60vh;text-align: left;overflow-y: auto;">
+        <MdPreview ref="mdPreviewRef" :modelValue="data.airesult" :theme="theme"/>
+      </div>
     </n-spin>
     <template #footer>
       <n-flex justify="space-between" ref="tipsRef">
@@ -2745,7 +2790,7 @@ watch(modalShow6, (newVal) => {
       </n-flex>
     </template>
   </n-modal>
-  <n-modal v-model:show="modalShow5" :title="data.name+'资金趋势'" style="width: 1000px" :preset="'card'">
+  <n-modal v-model:show="modalShow5" :title="data.name+'资金趋势'" style="width: 1000px;max-width: calc(100vw - 32px);" :preset="'card'">
     <money-trend :code="data.code" :name="data.name" :days="360" :dark-theme="data.darkTheme"
                  :chart-height="500"></money-trend>
   </n-modal>

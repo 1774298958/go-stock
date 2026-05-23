@@ -40,6 +40,9 @@ func NewApp() *App {
 // startup is called at application startup
 func (a *App) startup(ctx context.Context) {
 	defer PanicHandler()
+
+	data.ConfigureFromSettings(data.GetSettingConfig())
+
 	runtime.EventsOn(ctx, "frontendError", func(optionalData ...interface{}) {
 		logger.SugaredLogger.Errorf("Frontend error: %v\n", optionalData)
 	})
@@ -49,6 +52,8 @@ func (a *App) startup(ctx context.Context) {
 
 	// 应用启动时自动创建已启用的定时任务
 	a.InitCronTasks()
+
+	preCacheTradingDays()
 
 	// 监听设置更新事件
 	runtime.EventsOn(ctx, "updateSettings", func(optionalData ...interface{}) {
@@ -123,12 +128,12 @@ func (a *App) beforeClose(ctx context.Context) (prevent bool) {
 	}
 
 	logger.SugaredLogger.Debugf("dialog:%s", dialog)
-	if dialog == "取消" {
+	if dialog == "取消" || dialog == "No" {
 		return true // 如果选择了取消，不关闭应用
 	} else {
 		// 在 Linux 上应用退出时执行清理工作
 		if a.cron != nil {
-			a.cron.Stop() // 停止定时任务
+			a.cron.Stop()
 		}
 		return false // 如果选择了确定，继续关闭应用
 	}

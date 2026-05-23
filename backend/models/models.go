@@ -15,19 +15,21 @@ import (
 //-----------------------------------------------------------------------------------
 
 type StockChangeHistory struct {
-	ID         uint      `json:"id" gorm:"primarykey"`
-	ChangeTime string    `json:"changeTime" gorm:"uniqueIndex:idx_unique_change;size:10"`       // 异动时间 HH:MM:SS
-	ChangeDate string    `json:"changeDate" gorm:"uniqueIndex:idx_unique_change;index;size:10"` // 异动日期 YYYY-MM-DD
-	StockCode  string    `json:"stockCode" gorm:"uniqueIndex:idx_unique_change;index;size:20"`  // 股票代码
-	StockName  string    `json:"stockName" gorm:"size:50"`                                      // 股票名称
-	Market     int       `json:"market"`                                                        // 市场
-	ChangeType int       `json:"changeType" gorm:"uniqueIndex:idx_unique_change;index"`         // 异动类型代码
-	TypeName   string    `json:"typeName" gorm:"size:20"`                                       // 异动类型名称
-	Volume     int64     `json:"volume" gorm:"uniqueIndex:idx_unique_change"`                   // 成交量(股)
-	Price      float64   `json:"price" gorm:"uniqueIndex:idx_unique_change"`                    // 价格
-	ChangeRate float64   `json:"changeRate" gorm:"uniqueIndex:idx_unique_change"`               // 涨跌幅(%)
-	Amount     float64   `json:"amount" gorm:"uniqueIndex:idx_unique_change"`                   // 金额
-	CreatedAt  time.Time `json:"createdAt" gorm:"autoCreateTime"`
+	ID         uint      `json:"id" gorm:"primarykey" md:"-"`
+	ChangeTime string    `json:"changeTime" gorm:"uniqueIndex:idx_unique_change;size:10" md:"异动时间"`       // 异动时间 HH:MM:SS
+	ChangeDate string    `json:"changeDate" gorm:"uniqueIndex:idx_unique_change;index;size:10" md:"异动日期"` // 异动日期 YYYY-MM-DD
+	StockCode  string    `json:"stockCode" gorm:"uniqueIndex:idx_unique_change;index;size:20" md:"股票代码"`  // 股票代码
+	StockName  string    `json:"stockName" gorm:"size:50" md:"股票名称"`                                      // 股票名称
+	Market     int       `json:"market" md:"-"`                                                           // 市场
+	ChangeType int       `json:"changeType" gorm:"uniqueIndex:idx_unique_change;index" md:"-"`            // 异动类型代码
+	TypeName   string    `json:"typeName" gorm:"size:20" md:"异动类型名称"`                                     // 异动类型名称
+	Volume     int64     `json:"volume" gorm:"uniqueIndex:idx_unique_change" md:"成交量(股)"`                 // 成交量(股)
+	Price      float64   `json:"price" gorm:"uniqueIndex:idx_unique_change" md:"价格"`                      // 价格
+	ChangeRate float64   `json:"changeRate" gorm:"uniqueIndex:idx_unique_change" md:" 涨跌幅(%)"`            // 涨跌幅(%)
+	Amount     float64   `json:"amount" gorm:"uniqueIndex:idx_unique_change" md:"金额"`                     // 金额
+	Industry   string    `json:"industry" gorm:"size:100" md:"所属行业"`                                      // 所属行业
+	Concept    string    `json:"concept" gorm:"size:500" md:"所属概念"`                                       // 所属概念
+	CreatedAt  time.Time `json:"createdAt" gorm:"autoCreateTime" md:"-"`
 }
 
 func (StockChangeHistory) TableName() string {
@@ -35,15 +37,23 @@ func (StockChangeHistory) TableName() string {
 }
 
 type StockChangeHistoryQuery struct {
-	StockCode   string `json:"stockCode"`
-	StockName   string `json:"stockName"`
-	ChangeType  int    `json:"changeType"`
-	ChangeTypes []int  `json:"changeTypes"`
-	TypeName    string `json:"typeName"`
-	StartDate   string `json:"startDate"`
-	EndDate     string `json:"endDate"`
-	Page        int    `json:"page"`
-	PageSize    int    `json:"pageSize"`
+	StockCode     string  `json:"stockCode"`
+	StockName     string  `json:"stockName"`
+	ChangeType    int     `json:"changeType"`
+	ChangeTypes   []int   `json:"changeTypes"`
+	TypeName      string  `json:"typeName"`
+	StartDate     string  `json:"startDate"`
+	EndDate       string  `json:"endDate"`
+	StartTime     string  `json:"startTime"`
+	EndTime       string  `json:"endTime"`
+	MinVolume     int64   `json:"minVolume"`
+	MinAmount     float64 `json:"minAmount"`
+	MinChangeRate float64 `json:"minChangeRate"`
+	MaxChangeRate float64 `json:"maxChangeRate"`
+	Industry      string  `json:"industry"`
+	Concept       string  `json:"concept"`
+	Page          int     `json:"page"`
+	PageSize      int     `json:"pageSize"`
 }
 
 type StockChangeHistoryPageData struct {
@@ -461,10 +471,10 @@ type HotItem struct {
 	RankChange int     `json:"rank_change" md:"排名变化"`
 	//HasExist     interface{} `json:"has_exist" md:"-"`
 	//Symbol       string      `json:"symbol" md:"-"`
-	Percent float64 `json:"percent" md:"涨跌幅(%)"`
-	Current float64 `json:"current" md:"股价"`
-	Chg     float64 `json:"chg" md:"股价变化"`
-	//Exchange     string      `json:"exchange" md:"交易所代码"`
+	Percent  float64 `json:"percent" md:"涨跌幅(%)"`
+	Current  float64 `json:"current" md:"股价"`
+	Chg      float64 `json:"chg" md:"股价变化"`
+	Exchange string  `json:"exchange" md:"交易所代码"`
 	//StockType    int         `json:"stock_type" md:"-"`
 	//SubType      string      `json:"sub_type" md:"-"`
 	//Ad           int         `json:"ad" md:"-"`
@@ -1565,4 +1575,133 @@ type GlobalStockIndex struct {
 
 func (GlobalStockIndex) TableName() string {
 	return "global_stock_index"
+}
+
+type MarketStatistic struct {
+	ID            uint      `json:"id" gorm:"primarykey"`
+	DataDate      string    `json:"dataDate" gorm:"index;size:10"` // 日期 YYYY-MM-DD
+	DataTime      string    `json:"dataTime" gorm:"index;size:8"`  // 时间 HH:MM
+	UpCount       int       `json:"upCount"`                       // 上涨家数
+	DownCount     int       `json:"downCount"`                     // 下跌家数
+	UpRatio       float64   `json:"upRatio"`                       // 涨跌比(上涨家数占比)
+	UpDownRatio   float64   `json:"upDownRatio"`                   // 市场情绪指标(上涨家数/下跌家数)
+	SentimentDesc string    `json:"sentimentDesc" gorm:"size:20"`  // 市场情绪描述
+	LimitUp       int       `json:"limitUp"`                       // 涨停家数
+	LimitDown     int       `json:"limitDown"`                     // 跌停家数
+	LimitRatio    float64   `json:"limitRatio"`                    // 涨跌停比(涨停/跌停)
+	ShUpCount     int       `json:"shUpCount"`                     // 上海上涨家数
+	ShDownCount   int       `json:"shDownCount"`                   // 上海下跌家数
+	SzUpCount     int       `json:"szUpCount"`                     // 深圳上涨家数
+	SzDownCount   int       `json:"szDownCount"`                   // 深圳下跌家数
+	CreatedAt     time.Time `json:"createdAt" gorm:"autoCreateTime"`
+}
+
+func (MarketStatistic) TableName() string {
+	return "market_statistic"
+}
+
+type MCPServer struct {
+	ID          uint      `json:"id" gorm:"primarykey"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+	Name        string    `json:"name" gorm:"size:255;not null"`
+	Description string    `json:"description" gorm:"size:500"`
+	URL         string    `json:"url" gorm:"size:500"`
+	Command     string    `json:"command" gorm:"size:500"`
+	Args        string    `json:"args" gorm:"type:text"`
+	Env         string    `json:"env" gorm:"type:text"`
+	Enable      bool      `json:"enable" gorm:"default:true"`
+	Status      string    `json:"status" gorm:"size:20;default:stopped"`
+	TestResult  string    `json:"testResult" gorm:"size:500"`
+}
+
+func (MCPServer) TableName() string {
+	return "mcp_servers"
+}
+
+type MCPServerQuery struct {
+	Page     int    `json:"page"`
+	PageSize int    `json:"pageSize"`
+	Name     string `json:"name"`
+	Status   string `json:"status"`
+	Enable   *bool  `json:"enable"`
+}
+
+type MCPServerPageResp struct {
+	Total int         `json:"total"`
+	Data  []MCPServer `json:"data"`
+}
+
+type MCPServerTool struct {
+	ID           uint      `json:"id" gorm:"primarykey"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+	MCPServerID  uint      `json:"mcpServerId" gorm:"index;not null"`
+	ToolName     string    `json:"toolName" gorm:"size:255;not null"`
+	Description  string    `json:"description" gorm:"type:text"`
+	ParamsSchema string    `json:"paramsSchema" gorm:"type:text"`
+}
+
+func (MCPServerTool) TableName() string {
+	return "mcp_server_tools"
+}
+
+type Skill struct {
+	ID              uint      `json:"id" gorm:"primarykey"`
+	CreatedAt       time.Time `json:"createdAt"`
+	UpdatedAt       time.Time `json:"updatedAt"`
+	Name            string    `json:"name" gorm:"size:255;not null"`
+	Description     string    `json:"description" gorm:"size:500"`
+	Category        string    `json:"category" gorm:"size:50"`
+	SystemPrompt    string    `json:"systemPrompt" gorm:"type:text"`
+	Examples        string    `json:"examples" gorm:"type:text"`
+	TriggerKeywords string    `json:"triggerKeywords" gorm:"size:500"`
+	MCPServerIDs    string    `json:"mcpServerIds" gorm:"size:500"`
+	Enable          bool      `json:"enable" gorm:"default:true"`
+	SortOrder       int       `json:"sortOrder" gorm:"default:0"`
+}
+
+func (Skill) TableName() string {
+	return "skills"
+}
+
+type SkillQuery struct {
+	Page     int    `json:"page"`
+	PageSize int    `json:"pageSize"`
+	Name     string `json:"name"`
+	Category string `json:"category"`
+	Enable   *bool  `json:"enable"`
+}
+
+type SkillPageResp struct {
+	Total int     `json:"total"`
+	Data  []Skill `json:"data"`
+}
+
+type CustomStrategy struct {
+	ID          uint      `json:"id" gorm:"primarykey"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+	Name        string    `json:"name" gorm:"size:255;not null"`
+	Query       string    `json:"query" gorm:"type:text;not null"`
+	Description string    `json:"description" gorm:"size:500"`
+	SortOrder   int       `json:"sortOrder" gorm:"default:0"`
+}
+
+func (CustomStrategy) TableName() string {
+	return "custom_strategies"
+}
+
+type CustomStrategyQuery struct {
+	Page     int    `json:"page"`
+	PageSize int    `json:"pageSize"`
+	Name     string `json:"name"`
+}
+
+type CustomStrategyPageData struct {
+	List       []CustomStrategy `json:"list"`
+	Total      int64            `json:"total"`
+	Page       int              `json:"page"`
+	PageSize   int              `json:"pageSize"`
+	TotalPages int              `json:"totalPages"`
 }

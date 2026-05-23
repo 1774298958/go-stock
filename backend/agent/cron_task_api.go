@@ -108,6 +108,12 @@ func (a *CronTaskApi) GetAll() []models.CronTask {
 	return tasks
 }
 
+func (a *CronTaskApi) ExistsByTaskType(taskType string) bool {
+	var count int64
+	db.Dao.Model(&models.CronTask{}).Where("task_type = ?", taskType).Count(&count)
+	return count > 0
+}
+
 func (a *CronTaskApi) EnableTask(id uint, enable bool) error {
 	return db.Dao.Model(&models.CronTask{}).Where("id = ?", id).Updates(map[string]any{
 		"enable": enable,
@@ -233,6 +239,7 @@ func (a *CronTaskApi) executeStockAnalysis(ctx context.Context, task *models.Cro
 		Thinking    bool   `json:"thinking"`
 		StockCode   string `json:"stockCode"`
 		StockName   string `json:"stockName"`
+		AgentMode   string `json:"agentMode"`
 	}
 	if task.Params != "" {
 		err := json.Unmarshal([]byte(task.Params), &params)
@@ -249,7 +256,9 @@ func (a *CronTaskApi) executeStockAnalysis(ctx context.Context, task *models.Cro
 	msgs := data.NewDeepSeekOpenAi(ctx, params.AiConfigId).NewChatStream(params.StockName, data.ConvertTushareCodeToStockCode(params.StockCode), prompt, &params.SysPromptId, tools, params.Thinking)
 	content := &strings.Builder{}
 	for msg := range msgs {
-		content.WriteString(msg["content"].(string))
+		if v, ok := msg["content"].(string); ok {
+			content.WriteString(v)
+		}
 	}
 	logger.SugaredLogger.Infof("content:%s", content.String())
 	data.NewDeepSeekOpenAi(ctx, params.AiConfigId).SaveAIResponseResult(params.StockCode, params.StockName, content.String(), "", prompt)
@@ -328,10 +337,11 @@ func (a *CronTaskApi) executeCustomTask(ctx context.Context, task *models.CronTa
 func (a *CronTaskApi) executeMarketAnalysis(ctx context.Context, task *models.CronTask) error {
 	logger.SugaredLogger.Infof("执行市场分析任务：%s", task.Name)
 	var params struct {
-		PromptId    int  `json:"promptId"`
-		AiConfigId  int  `json:"aiConfigId"`
-		SysPromptId int  `json:"sysPromptId"`
-		Thinking    bool `json:"thinking"`
+		PromptId    int    `json:"promptId"`
+		AiConfigId  int    `json:"aiConfigId"`
+		SysPromptId int    `json:"sysPromptId"`
+		Thinking    bool   `json:"thinking"`
+		AgentMode   string `json:"agentMode"`
 	}
 	if task.Params != "" {
 		err := json.Unmarshal([]byte(task.Params), &params)
@@ -345,7 +355,7 @@ func (a *CronTaskApi) executeMarketAnalysis(ctx context.Context, task *models.Cr
 	prompt = data.NewPromptTemplateApi().GetPromptTemplateByID(params.PromptId)
 	content := &strings.Builder{}
 
-	ch := NewStockAiAgentApi().ChatWithContext(ctx, prompt, params.AiConfigId, &params.SysPromptId, false, 0, false)
+	ch := NewStockAiAgentApi().ChatWithContext(ctx, prompt, params.AiConfigId, &params.SysPromptId, false, 0, false, params.AgentMode)
 	for msg := range ch {
 		if msg.ReasoningContent != "" {
 			content.WriteString(msg.ReasoningContent)
@@ -397,7 +407,10 @@ func (a *CronTaskApi) executeStockChangeSave(ctx context.Context, task *models.C
 	}
 
 	if len(params.ChangeTypes) == 0 {
-		params.ChangeTypes = []int{8201, 8202, 8193, 4, 8204, 8203, 8194, 8}
+		params.ChangeTypes = []int{
+			8201, 8202, 8193, 4, 32, 64, 8207, 8209, 8211, 8213, 8215,
+			8204, 8203, 8194, 8, 16, 128, 8208, 8210, 8212, 8214, 8216,
+		}
 	}
 
 	api := data.NewStockChangesApi()

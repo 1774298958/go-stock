@@ -7,7 +7,8 @@
       :title="hasBackgroundTask ? 'go-stock AI Agent 助手正在后台分析...' : 'go-stock AI Agent 助手'"
     >
       <div class="edge-trigger-inner">
-        <NIcon :component="SparklesOutline" size="22" />
+        <NIcon :component="SparklesOutline" size="18" />
+        <span class="edge-trigger-text">AI助手</span>
         <div v-if="hasBackgroundTask" class="edge-trigger-badge" />
       </div>
     </div>
@@ -21,7 +22,7 @@
           size="small"
           class="panel-card"
           :bordered="false"
-          content-style="padding: 0; display: flex; flex-direction: column; height: 100%;"
+          content-style="padding: 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden;"
         >
           <template #header>
             <div class="panel-header">
@@ -44,7 +45,10 @@
             </div>
           </template>
 
-          <div class="chat-body">
+            <div class="chat-body">
+            <Transition name="hint-fade">
+              <div v-if="hintVisible" class="hint-bar">{{ hintText }}</div>
+            </Transition>
             <div v-if="shareTipVisible" class="share-tip">
               <div class="share-tip-text">{{ shareTipText }}</div>
               <NButton size="tiny" quaternary class="share-tip-close" @click="shareTipVisible = false">关闭</NButton>
@@ -67,6 +71,9 @@
                     <div
                       :class="['message-item', group.userMsg.role]"
                     >
+                      <div class="msg-avatar user-avatar">
+                        <NIcon :component="PersonCircleOutline" size="18" />
+                      </div>
                       <div class="msg-bubble">
                         <div class="msg-content">
                           <div v-if="group.userMsg.time" class="msg-meta msg-meta-user-inner">
@@ -82,9 +89,6 @@
                           />
                         </div>
                       </div>
-                      <div class="msg-avatar user-avatar">
-                        <NIcon :component="PersonCircleOutline" size="20" />
-                      </div>
                     </div>
                     <div
                       v-if="group.assistantMsg"
@@ -95,12 +99,57 @@
                       </div>
                       <div class="msg-bubble">
                         <div class="msg-content">
+                          <div v-if="group.assistantMsg.steps && group.assistantMsg.steps.length > 0" class="msg-steps-wrapper">
+                            <div class="msg-steps-header" @click="toggleReasoning(group.assistantIndex)">
+                              <NIcon :component="reasoningExpandedMap[group.assistantIndex] ? ChevronDownOutline : ChevronForwardOutline" size="14" />
+                              <span class="msg-steps-title">📋 执行步骤</span>
+                              <span class="msg-steps-count">{{ group.assistantMsg.steps.length }}</span>
+                            </div>
+                            <div v-show="reasoningExpandedMap[group.assistantIndex]" class="msg-steps-content">
+                              <div v-for="(step, si) in group.assistantMsg.steps" :key="si" class="msg-step-item">
+                                <div class="msg-step-dot" :class="getStepDotClass(step)"></div>
+                                <span class="msg-step-text">{{ step }}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div v-if="group.assistantMsg.reasoning" class="msg-reasoning-wrapper">
+                            <div class="msg-reasoning-header" @click="toggleReasoning('r-' + group.assistantIndex)">
+                              <NIcon :component="reasoningExpandedMap['r-' + group.assistantIndex] ? ChevronDownOutline : ChevronForwardOutline" size="14" />
+                              <span class="msg-reasoning-title">💭 思考过程</span>
+                            </div>
+                            <div v-show="reasoningExpandedMap['r-' + group.assistantIndex]" class="msg-reasoning-content">
+                              <MdPreview
+                                :theme="theme"
+                                :style="{ textAlign: 'left' }"
+                                :model-value="group.assistantMsg.reasoning"
+                                :editor-id="'agent-reasoning-' + group.assistantIndex"
+                                class="msg-markdown"
+                              />
+                            </div>
+                          </div>
+                          <div v-if="group.assistantMsg.jsonMarkdown" class="msg-json-md-wrapper">
+                            <div class="msg-json-md-header" @click="toggleReasoning('j-' + group.assistantIndex)">
+                              <NIcon :component="reasoningExpandedMap['j-' + group.assistantIndex] ? ChevronDownOutline : ChevronForwardOutline" size="14" />
+                              <span class="msg-json-md-title">📊 分析报告</span>
+                            </div>
+                            <div v-show="reasoningExpandedMap['j-' + group.assistantIndex]" class="msg-json-md-content">
+                              <MdPreview
+                                :theme="theme"
+                                :style="{ textAlign: 'left' }"
+                                :model-value="group.assistantMsg.jsonMarkdown"
+                                :editor-id="'agent-json-md-' + group.assistantIndex"
+                                class="msg-markdown"
+                                @onHtmlChanged="onMdHtmlChanged"
+                              />
+                            </div>
+                          </div>
                           <MdPreview
                             :theme="theme"
                             :style="{ textAlign: 'left' }"
                             :model-value="group.assistantMsg.content || '...'"
                             :editor-id="'agent-msg-' + group.assistantIndex"
                             class="msg-markdown"
+                            @onHtmlChanged="onMdHtmlChanged"
                           />
                           <div v-if="isStreamLoad && groupIndex === messageGroups.length - 1 && !group.assistantMsg.content" class="msg-loading">
                             <NSpin size="small" />
@@ -150,6 +199,7 @@
                 </div>
               </div>
             </NScrollbar>
+            </div>
 
             <div class="chat-footer">
               <div class="chat-footer-row">
@@ -209,6 +259,19 @@
                     class="chat-footer-memory-count"
                   />
                 </div>
+                <div class="chat-footer-agent-mode">
+                  <NSelect
+                    v-model:value="agentMode"
+                    :options="agentModeOptions"
+                    size="small"
+                    to="body"
+                    placement="top-start"
+                    placeholder="Agent模式"
+                    :consistent-menu-width="false"
+                    :menu-props="{ style: { zIndex: 10002 } }"
+                    class="chat-footer-agent-mode-select"
+                  />
+                </div>
               </div>
               <div class="chat-footer-input">
                 <NInput
@@ -238,7 +301,6 @@
                 </NButton>
               </div>
             </div>
-          </div>
         </NCard>
       </div>
     </div>
@@ -270,7 +332,8 @@ import {
   GetAiAssistantSession,
   ShareText,
   AbortChatWithAgent,
-  SaveAIResponseResult
+  SaveAIResponseResult,
+  SaveImage
 } from '../../wailsjs/go/main/App'
 import { EventsOff, EventsOn } from '../../wailsjs/runtime'
 import { MdPreview } from 'md-editor-v3'
@@ -289,6 +352,7 @@ const inputValue = ref('')
 const isStreamLoad = ref(false)
 const sentFromFloating = ref(false)
 const messages = ref([])
+let formatTimer = null
 const sessionId = ref('')
 const aiConfigOptions = ref([])
 const aiConfigId = ref(null)
@@ -312,9 +376,9 @@ const userPromptOptions = computed(() =>
   userPromptTemplates.value.map(t => ({ label: t.name ?? '', value: t.ID ?? t.id }))
 )
 const userPromptId = ref(null)
-const thinkingMode = ref(false)
-const memoryMode = ref(true)
-const memoryCount = ref(3)
+const thinkingMode = ref(true)
+const memoryMode = ref(false)
+const memoryCount = ref(1)
 const memoryCountOptions = [
   { label: '1 条', value: 1 },
   { label: '2 条', value: 2 },
@@ -323,6 +387,35 @@ const memoryCountOptions = [
   { label: '5 条', value: 5 },
   { label: '10 条', value: 10 },
 ]
+const agentMode = ref('auto')
+const agentModeOptions = [
+  { label: '🤖 自动选择', value: 'auto' },
+  { label: '⚡ 快速模式', value: 'react' },
+  { label: '🧠 规划模式', value: 'plan_execute' },
+]
+
+watch(agentMode, (val) => {
+  if (val === 'react') showHint('⚡ 快速模式推荐使用DeepSeek最新版')
+  else if (val === 'plan_execute') showHint('🧠 规划模式推荐使用GLM最新版')
+})
+
+watch(aiConfigId, (val) => {
+  const label = modelLabelForConfig(val).toLowerCase()
+  const labelCompact = label.replace(/[\s_-]/g, '')
+  if (label.includes('deepseek-chat')) {
+    agentMode.value = 'plan_execute'
+    thinkingMode.value = false
+    showHint('deepseek-chat 已使用规划模式并关闭思考模式')
+  } else if (label.includes('deepseek')) {
+    showHint('⚡ DeepSeek模型推荐使用快速模式')
+  } else if (labelCompact.includes('glm5.1')) {
+    agentMode.value = 'plan_execute'
+    thinkingMode.value = true
+    showHint('GLM 5.1 已使用规划模式并开启思考模式')
+  } else if (label.includes('glm')) {
+    showHint('🧠 GLM模型推荐使用规划模式')
+  }
+})
 
 function onUserPromptChange(id) {
   if (!id) return
@@ -337,11 +430,22 @@ const shareLoading = ref(false)
 const exportImageKey = ref('')
 const shareTipVisible = ref(false)
 const shareTipText = ref('')
+const hintVisible = ref(false)
+const hintText = ref('')
+let hintTimer = null
+
+function showHint(text) {
+  hintText.value = text
+  hintVisible.value = true
+  if (hintTimer) clearTimeout(hintTimer)
+  hintTimer = setTimeout(() => { hintVisible.value = false }, 3000)
+}
 const vipLevel = ref(0)
 const vipLoaded = ref(false)
 const vipLoading = ref(false)
 const isAborted = ref(false)
 const expandedGroups = ref(new Set())
+const reasoningExpandedMap = ref({})
 
 const hasBackgroundTask = computed(() => isStreamLoad.value && sentFromFloating.value && !panelVisible.value)
 const AGENT_EVENT = 'agent-message'
@@ -401,6 +505,46 @@ function ensureLatestGroupExpanded() {
     newSet.add(lastIndex)
     expandedGroups.value = newSet
   }
+}
+
+function toggleReasoning(index) {
+  reasoningExpandedMap.value = {
+    ...reasoningExpandedMap.value,
+    [index]: !reasoningExpandedMap.value[index]
+  }
+}
+
+function getStepDotClass(step) {
+  if (step.includes('✅')) return 'step-done'
+  if (step.includes('🔧')) return 'step-tool'
+  if (step.includes('⚡') || step.includes('🧠') || step.includes('📋') || step.includes('🔄')) return 'step-active'
+  return ''
+}
+
+function onMdHtmlChanged() {
+  nextTick(() => {
+    document.querySelectorAll('.msg-markdown .md-editor-code-block').forEach(block => {
+      if (block.querySelector('.code-collapse-btn')) return
+      const codeEl = block.querySelector('code')
+      if (!codeEl) return
+      const lang = (codeEl.className || '').toLowerCase()
+      const isJson = lang.includes('json') || lang.includes('language-json')
+      const text = codeEl.textContent || ''
+      const lineCount = text.split('\n').length
+      if (!isJson && lineCount <= 8) return
+
+      block.classList.add('code-collapsed')
+      const btn = document.createElement('span')
+      btn.className = 'code-collapse-btn'
+      btn.textContent = '展开'
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation()
+        const collapsed = block.classList.toggle('code-collapsed')
+        btn.textContent = collapsed ? '展开' : '收起'
+      })
+      block.appendChild(btn)
+    })
+  })
 }
 
 async function copyAiContent(msg) {
@@ -503,6 +647,27 @@ async function exportAiReplyImage(assistantIndex, evt) {
       shareTipVisible.value = true
       return
     }
+    const savedStyles = []
+    const overflowParents = []
+    let el = target.parentElement
+    while (el && el !== document.body) {
+      const style = getComputedStyle(el)
+      if (style.overflow === 'hidden' || style.overflowY === 'hidden' || style.overflowY === 'auto' || style.overflowY === 'scroll') {
+        savedStyles.push({ el, overflow: el.style.overflow, overflowY: el.style.overflowY, height: el.style.height, maxHeight: el.style.maxHeight })
+        overflowParents.push(el)
+        el.style.overflow = 'visible'
+        el.style.overflowY = 'visible'
+        el.style.height = 'auto'
+        el.style.maxHeight = 'none'
+      }
+      el = el.parentElement
+    }
+    const savedTargetStyle = { height: target.style.height, maxHeight: target.style.maxHeight, overflow: target.style.overflow, overflowY: target.style.overflowY }
+    target.style.height = 'auto'
+    target.style.maxHeight = 'none'
+    target.style.overflow = 'visible'
+    target.style.overflowY = 'visible'
+    await nextTick()
     const canvas = await html2canvas(target, {
       useCORS: true,
       scale: 2,
@@ -510,12 +675,25 @@ async function exportAiReplyImage(assistantIndex, evt) {
       logging: false,
       backgroundColor: darkTheme.value ? '#1e1e1e' : '#ffffff'
     })
-    const link = document.createElement('a')
+    target.style.height = savedTargetStyle.height
+    target.style.maxHeight = savedTargetStyle.maxHeight
+    target.style.overflow = savedTargetStyle.overflow
+    target.style.overflowY = savedTargetStyle.overflowY
+    savedStyles.forEach(({ el, overflow, overflowY, height, maxHeight }) => {
+      el.style.overflow = overflow
+      el.style.overflowY = overflowY
+      el.style.height = height
+      el.style.maxHeight = maxHeight
+    })
+    const dataUrl = canvas.toDataURL('image/png')
+    const base64 = dataUrl.replace(/^data:image\/png;base64,/, '')
     const safeTime = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-')
-    link.href = canvas.toDataURL('image/png')
-    link.download = `go-stock-agent-${safeTime}.png`
-    link.click()
-    shareTipText.value = '已导出为 PNG 图片'
+    const result = await SaveImage(`go-stock-agent-${safeTime}`, base64)
+    if (result && !result.includes('异常') && !result.includes('无法')) {
+      shareTipText.value = '已导出为 PNG 图片：' + result
+    } else {
+      shareTipText.value = result || '导出取消'
+    }
     shareTipVisible.value = true
   } catch (e) {
     shareTipText.value = '导出图片失败: ' + (e?.message ?? e)
@@ -529,6 +707,19 @@ function abortStream(showTip = true) {
   if (!isStreamLoad.value) return
   isAborted.value = true
   isStreamLoad.value = false
+  stopFormatTimer()
+  const last = messages.value[messages.value.length - 1]
+  if (last && last.role === 'assistant') {
+    if (last.rawContent) {
+      const fmt = formatMarkdown(last.rawContent)
+      last.content = fmt.content
+      if (fmt.jsonMarkdown) last.jsonMarkdown = fmt.jsonMarkdown
+    }
+    if (last.rawReasoning) {
+      const fmt = formatMarkdown(last.rawReasoning)
+      last.reasoning = fmt.content
+    }
+  }
   if (showTip) {
     shareTipText.value = '已中断本次 AI 回答'
     shareTipVisible.value = true
@@ -550,7 +741,10 @@ async function loadHistory() {
         role: m.role ?? '',
         content: m.content ?? '',
         time: m.time ?? '',
-        modelName: m.modelName ?? ''
+        modelName: m.modelName ?? '',
+        reasoning: m.reasoning ?? '',
+        steps: m.steps ?? [],
+        jsonMarkdown: m.jsonMarkdown ?? ''
       }))
       nextTick(() => {
         initDefaultExpanded()
@@ -566,7 +760,10 @@ function saveHistory() {
     role: m.role,
     content: m.content,
     time: m.time ?? '',
-    modelName: m.modelName ?? ''
+    modelName: m.modelName ?? '',
+    reasoning: m.reasoning ?? '',
+    steps: m.steps ?? [],
+    jsonMarkdown: m.jsonMarkdown ?? ''
   }))
   SaveAiAssistantSession(sessionId.value, list).catch(() => {})
 }
@@ -582,7 +779,8 @@ function openPanel() {
         role: 'assistant',
         content: '我是 go-stock AI Agent 助手，可以帮您分析股票、查询市场数据、获取研究报告等。请问有什么可以帮您的？',
         time: new Date().toLocaleString(),
-        modelName: ''
+        modelName: '',
+        reasoning: ''
       }
     ]
   }
@@ -644,26 +842,42 @@ function sendMessage() {
     role: 'user',
     content: text,
     time: new Date().toLocaleString(),
-    modelName: ''
+    modelName: '',
+    reasoning: '',
+    steps: []
   })
   const configId = aiConfigId.value ?? aiConfigOptions.value[0]?.value ?? 0
   const modelName = modelLabelForConfig(configId)
   messages.value.push({
     role: 'assistant',
     content: '',
+    rawContent: '',
     time: new Date().toLocaleString(),
-    modelName
+    modelName,
+    reasoning: '',
+    rawReasoning: '',
+    steps: [],
+    jsonMarkdown: ''
   })
   inputValue.value = ''
   isStreamLoad.value = true
   isAborted.value = false
   sentFromFloating.value = true
+  startFormatTimer()
   saveHistory()
   nextTick(() => {
     ensureLatestGroupExpanded()
+    const lastGroup = messageGroups.value[messageGroups.value.length - 1]
+    if (lastGroup) {
+      reasoningExpandedMap.value = {
+        ...reasoningExpandedMap.value,
+        [lastGroup.assistantIndex]: true,
+        ['j-' + lastGroup.assistantIndex]: true
+      }
+    }
     scrollToBottom()
   })
-  ChatWithAgent(text, configId, sysPromptId.value, memoryMode.value, memoryCount.value, thinkingMode.value)
+  ChatWithAgent(text, configId, sysPromptId.value, memoryMode.value, memoryCount.value, thinkingMode.value, agentMode.value === 'auto' ? '' : agentMode.value)
 }
 
 function startNewChat() {
@@ -675,6 +889,232 @@ function startNewChat() {
   sessionId.value = Date.now().toString()
 }
 
+function startFormatTimer() {
+  stopFormatTimer()
+  formatTimer = setInterval(() => {
+    const last = messages.value[messages.value.length - 1]
+    if (last && last.role === 'assistant') {
+      if (last.rawContent) {
+        const fmt = formatMarkdown(last.rawContent)
+        last.content = fmt.content
+        if (fmt.jsonMarkdown) last.jsonMarkdown = fmt.jsonMarkdown
+      }
+      if (last.rawReasoning) {
+        const fmt = formatMarkdown(last.rawReasoning)
+        last.reasoning = fmt.content
+      }
+    }
+  }, 1500)
+}
+
+function stopFormatTimer() {
+  if (formatTimer) {
+    clearInterval(formatTimer)
+    formatTimer = null
+  }
+}
+
+function formatMarkdown(content) {
+  if (!content) return { content: '', jsonMarkdown: '' }
+
+  const { content: cleaned, jsonMarkdown } = extractJsonMarkdown(content)
+
+  let inCodeBlock = false
+  const lines = cleaned.split('\n')
+  const result = []
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i]
+    const trimmed = line.replace(/^[\t ]+/, '')
+
+    if (trimmed.startsWith('```')) {
+      inCodeBlock = !inCodeBlock
+      if (!inCodeBlock) {
+        result.push(trimmed)
+        continue
+      }
+    }
+
+    if (inCodeBlock) {
+      result.push(line)
+      continue
+    }
+
+    if (trimmed !== line && trimmed !== '') {
+      line = trimmed
+    }
+
+    if (i > 0 && isBlockElement(trimmed)) {
+      const prev = result.length > 0 ? result[result.length - 1] : ''
+      if (prev !== '' && !isBlockElement(prev.replace(/^[\t ]+/, ''))) {
+        result.push('')
+      }
+    }
+
+    line = splitInlineHeading(line)
+
+    result.push(line)
+  }
+
+  return {
+    content: result.join('\n'),
+    jsonMarkdown
+  }
+}
+
+function hasMarkdownContent(str) {
+  if (!str || typeof str !== 'string') return false
+  return /(^|\n)\s*#{1,6}\s/.test(str) ||
+    /(^|\n)\s*\|/.test(str) ||
+    /(^|\n)\s*---/.test(str) ||
+    /(^|\n)\s*[-*+]\s/.test(str) ||
+    /(^|\n)\s*>\s/.test(str) ||
+    /(^|\n)\s*```/.test(str)
+}
+
+function extractMarkdownFromJson(obj) {
+  if (typeof obj === 'string') return obj
+  if (Array.isArray(obj)) {
+    const items = obj.map(item => typeof item === 'string' ? item : JSON.stringify(item, null, 2))
+    return items.join('\n\n')
+  }
+  if (typeof obj === 'object' && obj !== null) {
+    for (const key of ['response', 'content', 'text', 'result', 'answer', 'message', 'output']) {
+      if (obj[key] != null) {
+        const val = obj[key]
+        if (typeof val === 'string' && hasMarkdownContent(val)) return val
+        if (typeof val === 'object') {
+          const extracted = extractMarkdownFromJson(val)
+          if (extracted) return extracted
+        }
+      }
+    }
+    const values = Object.values(obj).filter(v => typeof v === 'string' && hasMarkdownContent(v))
+    if (values.length > 0) return values.join('\n\n')
+    const strValues = Object.values(obj).filter(v => typeof v === 'string')
+    if (strValues.length > 0) return strValues.join('\n\n')
+  }
+  return null
+}
+
+function extractJsonMarkdown(content) {
+  if (!content) return { content: '', jsonMarkdown: '' }
+  const cleaned = []
+  const jsonParts = []
+  let i = 0
+  const len = content.length
+  let inCodeBlock = false
+
+  while (i < len) {
+    if (content.substring(i, i + 3) === '```') {
+      inCodeBlock = !inCodeBlock
+      cleaned.push('```')
+      i += 3
+      continue
+    }
+
+    if (inCodeBlock) {
+      cleaned.push(content[i])
+      i++
+      continue
+    }
+
+    if (content[i] === '{') {
+      const end = findJsonEnd(content, i)
+      if (end > i) {
+        const jsonStr = content.substring(i, end + 1)
+        try {
+          const obj = JSON.parse(jsonStr)
+          const md = extractMarkdownFromJson(obj)
+          if (md) {
+            jsonParts.push(md)
+          } else {
+            cleaned.push('\n\n```json\n' + jsonStr + '\n```\n\n')
+          }
+          i = end + 1
+          continue
+        } catch {}
+      }
+    }
+    cleaned.push(content[i])
+    i++
+  }
+
+  return {
+    content: cleaned.join(''),
+    jsonMarkdown: jsonParts.join('\n\n---\n\n')
+  }
+}
+
+function findJsonEnd(content, start) {
+  let depth = 0
+  let bracketDepth = 0
+  let inStr = false
+  let escape = false
+  for (let i = start; i < content.length; i++) {
+    const ch = content[i]
+    if (escape) { escape = false; continue }
+    if (ch === '\\' && inStr) { escape = true; continue }
+    if (ch === '"') { inStr = !inStr; continue }
+    if (inStr) continue
+    if (ch === '[') bracketDepth++
+    else if (ch === ']') bracketDepth--
+    else if (ch === '{') depth++
+    else if (ch === '}') {
+      depth--
+      if (depth === 0 && bracketDepth === 0) return i
+    }
+  }
+  return -1
+}
+
+function splitInlineHeading(line) {
+  const match = line.match(/(#{1,6}\s+\S)/)
+  if (!match) return line
+  const idx = match.index
+  if (idx === 0) return line
+  const prefix = line.substring(0, idx)
+  if (prefix.trim() === '') return line
+  return prefix + '\n\n' + line.substring(idx)
+}
+
+function isBlockElement(line) {
+  if (!line || line.length === 0) return false
+  if (line[0] === '#') return true
+  if (line.startsWith('- ') || line.startsWith('* ') || line.startsWith('+ ')) return true
+  if (line.startsWith('```')) return true
+  if (line.startsWith('> ')) return true
+  if (line.length >= 2 && line[0] >= '1' && line[0] <= '9' && line[1] === '.') return true
+  if (line.startsWith('---') || line.startsWith('***') || line.startsWith('___')) return true
+  if (line.startsWith('|')) return true
+  return false
+}
+
+function parseStepText(text) {
+  if (!text) return [text]
+  const trimmed = text.trim()
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return [text]
+  try {
+    const obj = JSON.parse(trimmed)
+    if (Array.isArray(obj)) {
+      return obj.map((item, i) => `${i + 1}. ${typeof item === 'string' ? item : JSON.stringify(item)}`)
+    }
+    if (typeof obj === 'object' && obj !== null) {
+      const steps = obj.steps || obj.step || obj.plan || obj.items || obj.list
+      if (Array.isArray(steps)) {
+        return steps.map((item, i) => `${i + 1}. ${typeof item === 'string' ? item : JSON.stringify(item)}`)
+      }
+      const entries = Object.entries(obj)
+      if (entries.length > 0) {
+        return entries.map(([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`)
+      }
+    }
+    return [text]
+  } catch {
+    return [text]
+  }
+}
+
 function onAgentMessage(msg) {
   if (isAborted.value) return
 
@@ -682,9 +1122,21 @@ function onAgentMessage(msg) {
     isStreamLoad.value = false
     sentFromFloating.value = false
     isAborted.value = false
+    stopFormatTimer()
+    const last = messages.value[messages.value.length - 1]
+    if (last && last.role === 'assistant') {
+      if (last.rawContent) {
+        const fmt = formatMarkdown(last.rawContent)
+        last.content = fmt.content
+        if (fmt.jsonMarkdown) last.jsonMarkdown = fmt.jsonMarkdown
+      }
+      if (last.rawReasoning) {
+        const fmt = formatMarkdown(last.rawReasoning)
+        last.reasoning = fmt.content
+      }
+    }
     saveHistory()
     nextTick(scrollToBottom)
-    const last = messages.value[messages.value.length - 1]
     if (msg.content === 'agent-DONE' && last && last.role === 'assistant' && last.content) {
       const user = messages.value[messages.value.length - 2]
       SaveAIResponseResult("agent","市场分析", last.content, sessionId.value,user.content, aiConfigId.value)
@@ -698,8 +1150,25 @@ function onAgentMessage(msg) {
   }
 
   const last = messages.value[messages.value.length - 1]
-  if (last && last.role === 'assistant' && msg?.content) {
-    last.content = (last.content || '') + msg.content
+  if (last && last.role === 'assistant') {
+    if (msg?.reasoning_content) {
+      const rc = msg.reasoning_content
+      if (rc.startsWith('[STEP]')) {
+        const stepText = rc.replace(/^\[STEP\]/, '').trim()
+        if (stepText) {
+          if (!last.steps) last.steps = []
+          const parsed = parseStepText(stepText)
+          last.steps.push(...parsed)
+        }
+      } else {
+        last.rawReasoning = (last.rawReasoning || '') + rc
+        last.reasoning = last.rawReasoning
+      }
+    }
+    if (msg?.content) {
+      last.rawContent = (last.rawContent || '') + msg.content
+      last.content = last.rawContent
+    }
     nextTick(scrollToBottom)
   }
 }
@@ -793,8 +1262,17 @@ onBeforeUnmount(() => {
 .edge-trigger-inner {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 4px;
+}
+.edge-trigger-text {
+  font-size: 14px;
+  writing-mode: vertical-rl;
+  letter-spacing: 2px;
+  line-height: 1;
+  white-space: nowrap;
 }
 .edge-trigger-badge {
   position: absolute;
@@ -883,6 +1361,28 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  position: relative;
+}
+.hint-bar {
+  flex-shrink: 0;
+  margin: 10px 16px 0;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.12) 0%, rgba(118, 75, 162, 0.12) 100%);
+  border: 1px solid rgba(102, 126, 234, 0.25);
+  font-size: 13px;
+  color: var(--n-text-color-2);
+  text-align: center;
+  line-height: 1.5;
+}
+.hint-fade-enter-active,
+.hint-fade-leave-active {
+  transition: opacity 0.3s, transform 0.3s;
+}
+.hint-fade-enter-from,
+.hint-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 .share-tip {
   flex-shrink: 0;
@@ -915,7 +1415,6 @@ onBeforeUnmount(() => {
   flex-direction: column;
 }
 .chat-scroll :deep(.n-scrollbar-content) {
-  flex: 1;
   min-height: 0;
 }
 .message-list {
@@ -969,15 +1468,16 @@ onBeforeUnmount(() => {
 }
 .message-item {
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  gap: 6px;
   align-items: flex-start;
 }
 .message-item.user {
-  justify-content: flex-end;
+  align-items: flex-end;
 }
 .msg-avatar {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -996,11 +1496,9 @@ onBeforeUnmount(() => {
 }
 .msg-bubble {
   max-width: 100%;
-  flex: 1;
-  min-width: 0;
   width: 100%;
   box-sizing: border-box;
-  padding: 10px 14px;
+  padding: 8px 10px;
   border-radius: 12px;
   font-size: 14px;
   line-height: 1.5;
@@ -1027,6 +1525,172 @@ onBeforeUnmount(() => {
   width: 100%;
   min-width: 0;
   flex: 1;
+}
+.msg-reasoning-wrapper {
+  margin-bottom: 12px;
+  border: 1px solid var(--n-border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--n-color-hover);
+}
+.msg-steps-wrapper {
+  margin-bottom: 12px;
+  border: 1px solid var(--n-border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--n-color-hover);
+}
+.msg-steps-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  background: linear-gradient(135deg, rgba(56, 173, 169, 0.08) 0%, rgba(46, 139, 87, 0.08) 100%);
+  border-bottom: 1px solid var(--n-border-color);
+  transition: background 0.2s;
+}
+.msg-steps-header:hover {
+  background: linear-gradient(135deg, rgba(56, 173, 169, 0.14) 0%, rgba(46, 139, 87, 0.14) 100%);
+}
+.msg-steps-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--n-text-color-2);
+}
+.msg-steps-count {
+  font-size: 11px;
+  background: var(--n-primary-color);
+  color: #fff;
+  border-radius: 10px;
+  padding: 0 6px;
+  line-height: 18px;
+  min-width: 18px;
+  text-align: center;
+}
+.msg-steps-content {
+  padding: 10px 12px 10px 16px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.msg-step-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 4px 0;
+  position: relative;
+  font-size: 12px;
+  color: var(--n-text-color-2);
+  line-height: 1.5;
+}
+.msg-step-item:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 18px;
+  bottom: -4px;
+  width: 1px;
+  background: var(--n-border-color);
+}
+.msg-step-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--n-text-color-disabled);
+  flex-shrink: 0;
+  margin-top: 4px;
+  position: relative;
+  z-index: 1;
+}
+.msg-step-dot.step-active {
+  background: #e6a23c;
+  box-shadow: 0 0 4px rgba(230, 162, 60, 0.4);
+}
+.msg-step-dot.step-tool {
+  background: #409eff;
+  box-shadow: 0 0 4px rgba(64, 158, 255, 0.4);
+}
+.msg-step-dot.step-done {
+  background: #67c23a;
+  box-shadow: 0 0 4px rgba(103, 194, 58, 0.4);
+}
+.msg-step-text {
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+  text-align: left;
+}
+.msg-reasoning-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+  border-bottom: 1px solid var(--n-border-color);
+  transition: background 0.2s;
+}
+.msg-reasoning-header:hover {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.12) 0%, rgba(118, 75, 162, 0.12) 100%);
+}
+.msg-reasoning-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--n-text-color-2);
+}
+.msg-reasoning-content {
+  font-size: 12px;
+  color: var(--n-text-color-3);
+  white-space: pre-wrap;
+  padding: 12px;
+  line-height: 1.6;
+  max-height: 300px;
+  overflow-y: auto;
+  text-align: left;
+}
+.msg-json-md-wrapper {
+  margin-bottom: 12px;
+  border: 1px solid var(--n-border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--n-color-hover);
+}
+.msg-json-md-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.08) 100%);
+  border-bottom: 1px solid var(--n-border-color);
+  transition: background 0.2s;
+}
+.msg-json-md-header:hover {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.14) 0%, rgba(5, 150, 105, 0.14) 100%);
+}
+.msg-json-md-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--n-text-color-2);
+}
+.msg-json-md-content {
+  padding: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+  text-align: left;
+}
+.msg-reasoning {
+  font-size: 12px;
+  color: var(--n-text-color-3);
+  white-space: pre-wrap;
+  background: var(--n-color-hover);
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  border-left: 3px solid var(--n-primary-color);
 }
 .msg-bubble-actions {
   display: flex;
@@ -1097,9 +1761,15 @@ onBeforeUnmount(() => {
   min-width: 0;
   box-sizing: border-box;
 }
+.msg-content .msg-markdown :deep(.md-editor-preview-wrapper) {
+  width: 100%;
+}
 .msg-content .msg-markdown :deep(.md-editor-preview) {
   font-size: 13px;
   line-height: 1.6;
+  padding: 0 8px;
+  width: 100%;
+  box-sizing: border-box;
 }
 .message-item.user .msg-content :deep(.md-editor-preview),
 .message-item.user .msg-content :deep(.md-editor-preview-wrapper) {
@@ -1141,7 +1811,8 @@ onBeforeUnmount(() => {
 .chat-footer-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .chat-footer-select {
   flex: 1;
@@ -1174,7 +1845,10 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 .chat-footer-memory-count {
-  width: 80px;
+  width: 70px;
+}
+.chat-footer-agent-mode-select {
+  width: 120px;
 }
 .chat-footer-memory-count .n-select {
   width: 100%;
@@ -1186,6 +1860,7 @@ onBeforeUnmount(() => {
 }
 .chat-footer-input .n-input {
   flex: 1;
+  min-width: 0;
 }
 .chat-footer-input .n-input :deep(textarea) {
   text-align: left;
@@ -1235,5 +1910,45 @@ onBeforeUnmount(() => {
 <style>
 body > div:has(.n-select-menu) {
   z-index: 10002 !important;
+}
+
+.msg-markdown .md-editor-code-block {
+  position: relative;
+}
+.msg-markdown .md-editor-code-block pre {
+  margin: 0;
+}
+.msg-markdown .md-editor-code-block .code-collapse-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: var(--n-text-color-3);
+  background: var(--n-color-hover);
+  border: 1px solid var(--n-border-color);
+  border-radius: 0 4px 0 4px;
+  cursor: pointer;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.msg-markdown .md-editor-code-block:hover .code-collapse-btn {
+  opacity: 1;
+}
+.msg-markdown .md-editor-code-block.code-collapsed pre {
+  max-height: 80px;
+  overflow: hidden;
+}
+.msg-markdown .md-editor-code-block.code-collapsed::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(transparent, var(--n-color));
+  pointer-events: none;
 }
 </style>

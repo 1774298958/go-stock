@@ -124,4 +124,10 @@ func TestFetchAiModels(t *testing.T) {
 	app := NewApp()
 	models := app.FetchAiModels("https://ark.cn-beijing.volces.com/api/v3", "")
 	t.Log(models)
+
+}
+func TestGetLatestTradingDay(t *testing.T) {
+	app := NewApp()
+	date := app.GetLatestTradingDay()
+	t.Log(date)
 }

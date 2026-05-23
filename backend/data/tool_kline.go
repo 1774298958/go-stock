@@ -24,6 +24,14 @@ func buildStockKLineSection(o *OpenAi, stockCode string, toIntDay int64) string 
 	if strutil.HasPrefixAny(stockCode, []string{"hk", "us", "gb_"}) {
 		K = NewStockDataApi().GetHK_KLineData(stockCode, "day", o.KDays)
 	}
+	var sourceLabel string
+	if K == nil || len(*K) == 0 {
+		fallbackResult := FetchKLineWithFallback(stockCode, "", "101", int(toIntDay), "")
+		if fallbackResult.Data != nil && len(*fallbackResult.Data) > 0 {
+			K = fallbackResult.Data
+			sourceLabel = fallbackResult.Source
+		}
+	}
 	if K == nil || len(*K) == 0 {
 		return stockCode + "：未获取到 K 线数据。"
 	}
@@ -41,7 +49,11 @@ func buildStockKLineSection(o *OpenAi, stockCode string, toIntDay int64) string 
 	}
 	jsonData, _ := json.Marshal(Kmap)
 	markdownTable, _ := JSONToMarkdownTable(jsonData)
-	return "\r\n ### " + stockCode + convertor.ToString(toIntDay) + "日K线数据：\r\n" + markdownTable + "\r\n"
+	sourceInfo := ""
+	if sourceLabel != "" {
+		sourceInfo = "（数据源：" + sourceLabel + "）"
+	}
+	return "\r\n ### " + stockCode + convertor.ToString(toIntDay) + "日K线数据" + sourceInfo + "：\r\n" + markdownTable + "\r\n"
 }
 
 // handleGetStockKLine 处理 GetStockKLine 工具调用
@@ -62,12 +74,12 @@ func handleGetStockKLine(o *OpenAi, funcArguments string, ctx *ToolContext) erro
 	}
 
 	ctx.Ch <- map[string]any{
-		"code":     1,
-		"question": ctx.Question,
-		"chatId":   ctx.StreamResponseID,
-		"model":    ctx.Model,
-		"content":  "\r\n```\r\n开始调用工具：GetStockKLine，\n参数：" + funcArguments + "\r\n```\r\n",
-		"time":     time.Now().Format(time.DateTime),
+		"code":              1,
+		"question":          ctx.Question,
+		"chatId":            ctx.StreamResponseID,
+		"model":             ctx.Model,
+		"reasoning_content": "\r\n```\r\n🔧 开始调用工具：GetStockKLine，\n参数：" + funcArguments + "\r\n```\r\n",
+		"time":              time.Now().Format(time.DateTime),
 	}
 
 	toIntDay, convErr := convertor.ToInt(days)

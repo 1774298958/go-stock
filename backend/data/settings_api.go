@@ -22,6 +22,7 @@ type Settings struct {
 	OpenAiEnable           bool   `json:"openAiEnable"`
 	Prompt                 string `json:"prompt"`
 	CheckUpdate            bool   `json:"checkUpdate"`
+	UpdateChannel          string `json:"updateChannel"`
 	QuestionTemplate       string `json:"questionTemplate"`
 	CrawlTimeOut           int64  `json:"crawlTimeOut"`
 	KDays                  int64  `json:"kDays"`
@@ -38,9 +39,11 @@ type Settings struct {
 	HttpProxyEnabled       bool   `json:"httpProxyEnabled"`
 	EnableAgent            bool   `json:"enableAgent"`
 	QgqpBId                string `json:"qgqpBId" gorm:"column:qgqp_b_id"`
-	// 记录上一次窗口大小（用户拖动调整后保存），为 0 表示未设置，使用自适应默认值
-	WindowWidth  int `json:"windowWidth"`
-	WindowHeight int `json:"windowHeight"`
+	IwencaiApiKey          string `json:"iwencaiApiKey" gorm:"column:iwencai_api_key"`
+	EmApiKey               string `json:"emApiKey" gorm:"column:em_api_key"`
+	WindowWidth            int    `json:"windowWidth"`
+	WindowHeight           int    `json:"windowHeight"`
+	PromptPlazaApiBase     string `json:"promptPlazaApiBase" gorm:"column:prompt_plaza_api_base"`
 }
 
 func (receiver Settings) TableName() string {
@@ -73,6 +76,18 @@ type SettingConfig struct {
 	AiConfigs []*AIConfig `json:"aiConfigs"`
 }
 
+func (c *SettingConfig) GetAIConfigThinking(aiConfigId int) bool {
+	if aiConfigId <= 0 && len(c.AiConfigs) > 0 {
+		return c.AiConfigs[0].Thinking
+	}
+	for _, cfg := range c.AiConfigs {
+		if int(cfg.ID) == aiConfigId {
+			return cfg.Thinking
+		}
+	}
+	return false
+}
+
 type SettingsApi struct {
 	Config *SettingConfig
 }
@@ -89,10 +104,13 @@ func (s *SettingsApi) Export() string {
 }
 
 func UpdateConfig(s *SettingConfig) string {
+	if s.Settings == nil {
+		return "保存失败: 配置数据为空"
+	}
 	count := int64(0)
 	db.Dao.Model(&Settings{}).Count(&count)
 	if count > 0 {
-		db.Dao.Model(&Settings{}).Where("id=?", s.ID).Updates(map[string]any{
+		result := db.Dao.Model(&Settings{}).Where("id=?", s.ID).Updates(map[string]any{
 			"local_push_enable":          s.LocalPushEnable,
 			"ding_push_enable":           s.DingPushEnable,
 			"ding_robot":                 s.DingRobot,
@@ -102,6 +120,7 @@ func UpdateConfig(s *SettingConfig) string {
 			"tushare_token":              s.TushareToken,
 			"prompt":                     s.Prompt,
 			"check_update":               s.CheckUpdate,
+			"update_channel":             s.UpdateChannel,
 			"question_template":          s.QuestionTemplate,
 			"crawl_time_out":             s.CrawlTimeOut,
 			"k_days":                     s.KDays,
@@ -117,25 +136,37 @@ func UpdateConfig(s *SettingConfig) string {
 			"http_proxy_enabled":         s.HttpProxyEnabled,
 			"enable_agent":               s.EnableAgent,
 			"qgqp_b_id":                  s.QgqpBId,
+			"iwencai_api_key":            s.IwencaiApiKey,
+			"em_api_key":                 s.EmApiKey,
 			"window_width":               s.WindowWidth,
 			"window_height":              s.WindowHeight,
+			"prompt_plaza_api_base":      s.PromptPlazaApiBase,
 		})
+		if result.Error != nil {
+			logger.SugaredLogger.Errorf("更新配置失败: %v", result.Error)
+			return "保存失败: " + result.Error.Error()
+		}
 
-		//更新AiConfig
 		err := updateAiConfigs(s.AiConfigs)
 		if err != nil {
 			logger.SugaredLogger.Errorf("更新AI模型服务配置失败: %v", err)
 			return "更新AI模型服务配置失败: " + err.Error()
 		}
 	} else {
-		//logger.SugaredLogger.Infof("未找到配置，创建默认配置")
-		// 创建主配置
-		result := db.Dao.Model(&Settings{}).Create(&Settings{})
+		result := db.Dao.Model(&Settings{}).Create(s.Settings)
 		if result.Error != nil {
 			logger.SugaredLogger.Error("创建配置失败:", result.Error)
 			return "创建配置失败: " + result.Error.Error()
 		}
+		err := updateAiConfigs(s.AiConfigs)
+		if err != nil {
+			logger.SugaredLogger.Errorf("更新AI模型服务配置失败: %v", err)
+			return "更新AI模型服务配置失败: " + err.Error()
+		}
 	}
+
+	ConfigureFromSettings(s)
+
 	return "保存成功！"
 }
 
@@ -187,6 +218,7 @@ func updateAiConfigs(aiConfigs []*AIConfig) error {
 				"http_proxy":         item.HttpProxy,
 				"http_proxy_enabled": item.HttpProxyEnabled,
 				"session_id":         item.SessionId,
+				"thinking":           item.Thinking,
 			}).Error
 			if e != nil {
 				return
@@ -240,7 +272,6 @@ func GetSettingConfig() *SettingConfig {
 	if settings.BrowserPoolSize <= 0 {
 		settings.BrowserPoolSize = 1
 	}
-	settings.EnableFund = false
 	settings.EnableAgent = false
 
 	settingConfig.Settings = settings

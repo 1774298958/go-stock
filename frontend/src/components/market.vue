@@ -1,6 +1,6 @@
-﻿<script setup>
+<script setup>
 import * as echarts from "echarts";
-import {computed, h, onBeforeMount, onBeforeUnmount, onMounted,onUnmounted, ref} from 'vue'
+import {computed, h, nextTick, onBeforeMount, onBeforeUnmount, onMounted,onUnmounted, ref} from 'vue'
 import {
   GetAIResponseResult,
   GetConfig,
@@ -8,6 +8,9 @@ import {
   GetPromptTemplates,
   GetTelegraphList,
   GlobalStockIndexes,
+  IsTradingTime,
+  IsHKTradingTime,
+  IsUSTradingTime,
   ReFleshTelegraphList,
   SaveAIResponseResult,
   SaveAsMarkdown,
@@ -34,7 +37,6 @@ import HotEvents from "./HotEvents.vue";
 import HotTopics from "./HotTopics.vue";
 import InvestCalendarTimeLine from "./InvestCalendarTimeLine.vue";
 import ClsCalendarTimeLine from "./ClsCalendarTimeLine.vue";
-import SelectStock from "./SelectStock.vue";
 import Stockhotmap from "./stockhotmap.vue";
 
 const route = useRoute()
@@ -77,9 +79,12 @@ const sort = ref("0")
 const nowTab = ref("市场快讯")
 const indexInterval = ref(null)
 const indexIndustryRank = ref(null)
+const tradingCheckInterval = ref(null)
+const mdPreviewRef = ref(null)
+const aiResultScrollRef = ref(null)
 const stockCode= ref('')
 const enableTools= ref(true)
-const thinkingMode = ref(false)
+const thinkingMode = ref(true)
 const treemapRef = ref(null);
 let treemapchart =null;
 
@@ -123,20 +128,21 @@ onBeforeMount(() => {
   })
   getIndex();
   industryRank();
-  indexInterval.value = setInterval(() => {
-    getIndex()
-  }, 3000)
+  startTradingTimers();
 
-  indexIndustryRank.value = setInterval(() => {
-    industryRank()
-    ReFlesh("财联社电报")
-    ReFlesh("新浪财经")
-    ReFlesh("外媒")
-  }, 1000 * 10)
-
-
-})
-onMounted(() => {
+  tradingCheckInterval.value = setInterval(async () => {
+    const [cn, hk, us] = await Promise.all([
+      IsTradingTime().catch(() => false),
+      IsHKTradingTime().catch(() => false),
+      IsUSTradingTime().catch(() => false)
+    ])
+    const anyTrading = cn || hk || us
+    if (anyTrading && !indexInterval.value) {
+      startTradingTimers()
+    } else if (!anyTrading && indexInterval.value) {
+      stopTradingTimers()
+    }
+  }, 60000)
 })
 
 
@@ -145,9 +151,35 @@ onBeforeUnmount(() => {
   EventsOff("newTelegraph")
   EventsOff("newSinaNews")
   EventsOff("summaryStockNews")
-  clearInterval(indexInterval.value)
-  clearInterval(indexIndustryRank.value)
+  stopTradingTimers()
+  if (tradingCheckInterval.value) {
+    clearInterval(tradingCheckInterval.value)
+  }
 })
+
+function startTradingTimers() {
+  stopTradingTimers()
+  indexInterval.value = setInterval(() => {
+    getIndex()
+  }, 3000)
+  indexIndustryRank.value = setInterval(() => {
+    industryRank()
+    ReFlesh("财联社电报")
+    ReFlesh("新浪财经")
+    ReFlesh("外媒")
+  }, 1000 * 10)
+}
+
+function stopTradingTimers() {
+  if (indexInterval.value) {
+    clearInterval(indexInterval.value)
+    indexInterval.value = null
+  }
+  if (indexIndustryRank.value) {
+    clearInterval(indexIndustryRank.value)
+    indexIndustryRank.value = null
+  }
+}
 
 onUnmounted(() => {
 
@@ -265,13 +297,11 @@ function updateTab(name) {
 }
 
 EventsOn("summaryStockNews", async (msg) => {
-  loading.value = false
-  ////console.log(msg)
   if (msg === "DONE") {
     await SaveAIResponseResult("市场资讯", "市场资讯", aiSummary.value, chatId.value, question.value,aiConfigId.value)
     message.info("AI分析完成！")
     message.destroyAll()
-
+    loading.value = false
   } else {
     if (msg.chatId) {
       chatId.value = msg.chatId
@@ -279,8 +309,14 @@ EventsOn("summaryStockNews", async (msg) => {
     if (msg.question) {
       question.value = msg.question
     }
+    if (msg.content || msg.reasoning_content || msg.extraContent) {
+      loading.value = false
+    }
     if (msg.content) {
       aiSummary.value = aiSummary.value + msg.content
+    }
+    if (msg.reasoning_content) {
+      aiSummary.value = aiSummary.value + msg.reasoning_content
     }
     if (msg.extraContent) {
       aiSummary.value = aiSummary.value + msg.extraContent
@@ -291,8 +327,20 @@ EventsOn("summaryStockNews", async (msg) => {
     if (msg.time) {
       aiSummaryTime.value = msg.time
     }
+    scrollToAiResultBottom()
   }
 })
+
+function scrollToAiResultBottom() {
+  nextTick(() => {
+    requestAnimationFrame(() => {
+      const el = aiResultScrollRef.value
+      if (el) {
+        el.scrollTop = el.scrollHeight
+      }
+    })
+  })
+}
 
 async function copyToClipboard() {
   try {
@@ -696,18 +744,17 @@ function ReFlesh(source) {
           </n-tab-pane>
         </n-tabs>
       </n-tab-pane>
-      <n-tab-pane name="指标选股" tab="指标选股">
-        <select-stock />
-      </n-tab-pane>
       <n-tab-pane name="名站优选" tab="名站优选">
         <Stockhotmap />
       </n-tab-pane>
     </n-tabs>
   </n-card>
-  <n-modal transform-origin="center" v-model:show="summaryModal" preset="card" style="width: 800px;"
+  <n-modal transform-origin="center" v-model:show="summaryModal" preset="card" style="width: 800px;max-width: calc(100vw - 32px);"
            :title="'AI市场资讯总结'">
     <n-spin size="small" :show="loading">
-      <MdPreview style="height: 440px;text-align: left" :modelValue="aiSummary" :theme="theme"/>
+      <div ref="aiResultScrollRef" style="height: 440px;max-height: 60vh;text-align: left;overflow-y: auto;">
+        <MdPreview ref="mdPreviewRef" :modelValue="aiSummary" :theme="theme"/>
+      </div>
     </n-spin>
     <template #footer>
       <n-flex justify="space-between" ref="tipsRef">

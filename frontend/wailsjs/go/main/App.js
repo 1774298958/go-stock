@@ -62,8 +62,12 @@ export function CalculateNextRunTimes(arg1, arg2) {
   return window['go']['main']['App']['CalculateNextRunTimes'](arg1, arg2);
 }
 
-export function ChatWithAgent(arg1, arg2, arg3, arg4, arg5, arg6) {
-  return window['go']['main']['App']['ChatWithAgent'](arg1, arg2, arg3, arg4, arg5, arg6);
+export function ChatWithAgent(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['main']['App']['ChatWithAgent'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+}
+
+export function CheckDeviceBinding(arg1, arg2) {
+  return window['go']['main']['App']['CheckDeviceBinding'](arg1, arg2);
 }
 
 export function CheckFrequentTrading(arg1) {
@@ -90,6 +94,14 @@ export function CreateCronTask(arg1) {
   return window['go']['main']['App']['CreateCronTask'](arg1);
 }
 
+export function CreateMCPServer(arg1) {
+  return window['go']['main']['App']['CreateMCPServer'](arg1);
+}
+
+export function CreateSkill(arg1) {
+  return window['go']['main']['App']['CreateSkill'](arg1);
+}
+
 export function DelPrompt(arg1) {
   return window['go']['main']['App']['DelPrompt'](arg1);
 }
@@ -110,8 +122,20 @@ export function DeleteCronTask(arg1) {
   return window['go']['main']['App']['DeleteCronTask'](arg1);
 }
 
+export function DeleteCustomStrategy(arg1) {
+  return window['go']['main']['App']['DeleteCustomStrategy'](arg1);
+}
+
+export function DeleteMCPServer(arg1) {
+  return window['go']['main']['App']['DeleteMCPServer'](arg1);
+}
+
 export function DeletePromptTemplate(arg1) {
   return window['go']['main']['App']['DeletePromptTemplate'](arg1);
+}
+
+export function DeleteSkill(arg1) {
+  return window['go']['main']['App']['DeleteSkill'](arg1);
 }
 
 export function DeleteStockChangeHistory(arg1) {
@@ -130,6 +154,14 @@ export function EnableCronTask(arg1, arg2) {
   return window['go']['main']['App']['EnableCronTask'](arg1, arg2);
 }
 
+export function EnableMCPServer(arg1, arg2) {
+  return window['go']['main']['App']['EnableMCPServer'](arg1, arg2);
+}
+
+export function EnableSkill(arg1, arg2) {
+  return window['go']['main']['App']['EnableSkill'](arg1, arg2);
+}
+
 export function ExecuteCronTaskNow(arg1) {
   return window['go']['main']['App']['ExecuteCronTaskNow'](arg1);
 }
@@ -138,8 +170,16 @@ export function ExportConfig() {
   return window['go']['main']['App']['ExportConfig']();
 }
 
+export function FetchAiModelInfo(arg1, arg2, arg3) {
+  return window['go']['main']['App']['FetchAiModelInfo'](arg1, arg2, arg3);
+}
+
 export function FetchAiModels(arg1, arg2) {
   return window['go']['main']['App']['FetchAiModels'](arg1, arg2);
+}
+
+export function FetchAndSaveMarketStatistic() {
+  return window['go']['main']['App']['FetchAndSaveMarketStatistic']();
 }
 
 export function Follow(arg1) {
@@ -174,12 +214,24 @@ export function GetAllConcepts() {
   return window['go']['main']['App']['GetAllConcepts']();
 }
 
+export function GetAllCustomStrategies() {
+  return window['go']['main']['App']['GetAllCustomStrategies']();
+}
+
 export function GetAllIndustries() {
   return window['go']['main']['App']['GetAllIndustries']();
 }
 
+export function GetAllMCPTools() {
+  return window['go']['main']['App']['GetAllMCPTools']();
+}
+
 export function GetAllMarkets() {
   return window['go']['main']['App']['GetAllMarkets']();
+}
+
+export function GetAllSkills() {
+  return window['go']['main']['App']['GetAllSkills']();
 }
 
 export function GetAllStockChangesWithPaging(arg1) {
@@ -198,6 +250,18 @@ export function GetAllStocks(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['GetAllStocks'](arg1, arg2, arg3, arg4);
 }
 
+export function GetChangeRank(arg1, arg2) {
+  return window['go']['main']['App']['GetChangeRank'](arg1, arg2);
+}
+
+export function GetChangeTypeDailyStats(arg1) {
+  return window['go']['main']['App']['GetChangeTypeDailyStats'](arg1);
+}
+
+export function GetChipDistribution(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GetChipDistribution'](arg1, arg2, arg3, arg4);
+}
+
 export function GetConfig() {
   return window['go']['main']['App']['GetConfig']();
 }
@@ -214,6 +278,18 @@ export function GetCronTaskTypes() {
   return window['go']['main']['App']['GetCronTaskTypes']();
 }
 
+export function GetCustomStrategyList(arg1) {
+  return window['go']['main']['App']['GetCustomStrategyList'](arg1);
+}
+
+export function GetDailyChangeStats(arg1) {
+  return window['go']['main']['App']['GetDailyChangeStats'](arg1);
+}
+
+export function GetDailyDimensionStats(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetDailyDimensionStats'](arg1, arg2, arg3);
+}
+
 export function GetEffectiveSponsorVip() {
   return window['go']['main']['App']['GetEffectiveSponsorVip']();
 }
@@ -224,6 +300,26 @@ export function GetFollowList(arg1) {
 
 export function GetFollowedFund() {
   return window['go']['main']['App']['GetFollowedFund']();
+}
+
+export function GetFollowedFundPaged(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetFollowedFundPaged'](arg1, arg2, arg3);
+}
+
+export function GetFundHistoryNetValue(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GetFundHistoryNetValue'](arg1, arg2, arg3, arg4);
+}
+
+export function GetFundKLine(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetFundKLine'](arg1, arg2, arg3);
+}
+
+export function GetFundRanking(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['GetFundRanking'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
+export function GetFundTop10Holdings(arg1) {
+  return window['go']['main']['App']['GetFundTop10Holdings'](arg1);
 }
 
 export function GetGroupList() {
@@ -246,6 +342,30 @@ export function GetIndustryRank(arg1, arg2) {
   return window['go']['main']['App']['GetIndustryRank'](arg1, arg2);
 }
 
+export function GetLatestTradingDay() {
+  return window['go']['main']['App']['GetLatestTradingDay']();
+}
+
+export function GetMCPServerByID(arg1) {
+  return window['go']['main']['App']['GetMCPServerByID'](arg1);
+}
+
+export function GetMCPServerList(arg1) {
+  return window['go']['main']['App']['GetMCPServerList'](arg1);
+}
+
+export function GetMCPToolsByServerID(arg1) {
+  return window['go']['main']['App']['GetMCPToolsByServerID'](arg1);
+}
+
+export function GetMachineId() {
+  return window['go']['main']['App']['GetMachineId']();
+}
+
+export function GetMarketStatisticByDate(arg1) {
+  return window['go']['main']['App']['GetMarketStatisticByDate'](arg1);
+}
+
 export function GetMoneyRankSina(arg1) {
   return window['go']['main']['App']['GetMoneyRankSina'](arg1);
 }
@@ -256,6 +376,18 @@ export function GetPromptTemplateList(arg1) {
 
 export function GetPromptTemplates(arg1, arg2) {
   return window['go']['main']['App']['GetPromptTemplates'](arg1, arg2);
+}
+
+export function GetRecentDaysMarketStatistic(arg1) {
+  return window['go']['main']['App']['GetRecentDaysMarketStatistic'](arg1);
+}
+
+export function GetSkillByID(arg1) {
+  return window['go']['main']['App']['GetSkillByID'](arg1);
+}
+
+export function GetSkillList(arg1) {
+  return window['go']['main']['App']['GetSkillList'](arg1);
 }
 
 export function GetSponsorInfo() {
@@ -286,6 +418,14 @@ export function GetStockKLine(arg1, arg2, arg3) {
   return window['go']['main']['App']['GetStockKLine'](arg1, arg2, arg3);
 }
 
+export function GetStockKLinePageWithFallback(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['GetStockKLinePageWithFallback'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function GetStockKLineWithFallback(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GetStockKLineWithFallback'](arg1, arg2, arg3, arg4);
+}
+
 export function GetStockList(arg1) {
   return window['go']['main']['App']['GetStockList'](arg1);
 }
@@ -302,12 +442,40 @@ export function GetStockRealTimePrice(arg1) {
   return window['go']['main']['App']['GetStockRealTimePrice'](arg1);
 }
 
+export function GetTdxCallAuction(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetTdxCallAuction'](arg1, arg2, arg3);
+}
+
+export function GetTdxCompanyCategoryContent(arg1, arg2) {
+  return window['go']['main']['App']['GetTdxCompanyCategoryContent'](arg1, arg2);
+}
+
+export function GetTdxCompanyCategoryList(arg1) {
+  return window['go']['main']['App']['GetTdxCompanyCategoryList'](arg1);
+}
+
+export function GetTdxCompanyInfo(arg1) {
+  return window['go']['main']['App']['GetTdxCompanyInfo'](arg1);
+}
+
+export function GetTdxFinanceInfo(arg1) {
+  return window['go']['main']['App']['GetTdxFinanceInfo'](arg1);
+}
+
+export function GetTdxXDXRInfo(arg1) {
+  return window['go']['main']['App']['GetTdxXDXRInfo'](arg1);
+}
+
 export function GetTelegraphList(arg1) {
   return window['go']['main']['App']['GetTelegraphList'](arg1);
 }
 
 export function GetTimezone() {
   return window['go']['main']['App']['GetTimezone']();
+}
+
+export function GetTodayMarketStatistic() {
+  return window['go']['main']['App']['GetTodayMarketStatistic']();
 }
 
 export function GetTradingRecordById(arg1) {
@@ -320,6 +488,18 @@ export function GetTradingRecordList(arg1) {
 
 export function GetTradingRecordStatistics() {
   return window['go']['main']['App']['GetTradingRecordStatistics']();
+}
+
+export function GetTypeStatsByDate(arg1) {
+  return window['go']['main']['App']['GetTypeStatsByDate'](arg1);
+}
+
+export function GetUplimitHot(arg1, arg2) {
+  return window['go']['main']['App']['GetUplimitHot'](arg1, arg2);
+}
+
+export function GetUserManual() {
+  return window['go']['main']['App']['GetUserManual']();
 }
 
 export function GetVersionInfo() {
@@ -340,6 +520,10 @@ export function GlobalStockIndexesReadable() {
 
 export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
+}
+
+export function HideToTray() {
+  return window['go']['main']['App']['HideToTray']();
 }
 
 export function HotEvent(arg1) {
@@ -370,6 +554,22 @@ export function InvestCalendarTimeLine(arg1) {
   return window['go']['main']['App']['InvestCalendarTimeLine'](arg1);
 }
 
+export function IsHKTradingTime() {
+  return window['go']['main']['App']['IsHKTradingTime']();
+}
+
+export function IsTradingDay(arg1) {
+  return window['go']['main']['App']['IsTradingDay'](arg1);
+}
+
+export function IsTradingTime() {
+  return window['go']['main']['App']['IsTradingTime']();
+}
+
+export function IsUSTradingTime() {
+  return window['go']['main']['App']['IsUSTradingTime']();
+}
+
 export function LongTigerRank(arg1) {
   return window['go']['main']['App']['LongTigerRank'](arg1);
 }
@@ -384,6 +584,10 @@ export function NewsPush(arg1) {
 
 export function OpenURL(arg1) {
   return window['go']['main']['App']['OpenURL'](arg1);
+}
+
+export function QuitApp() {
+  return window['go']['main']['App']['QuitApp']();
 }
 
 export function ReFleshTelegraphList(arg1) {
@@ -410,6 +614,10 @@ export function SaveAsMarkdown(arg1, arg2) {
   return window['go']['main']['App']['SaveAsMarkdown'](arg1, arg2);
 }
 
+export function SaveCustomStrategy(arg1) {
+  return window['go']['main']['App']['SaveCustomStrategy'](arg1);
+}
+
 export function SaveImage(arg1, arg2) {
   return window['go']['main']['App']['SaveImage'](arg1, arg2);
 }
@@ -424,6 +632,10 @@ export function SaveWordFile(arg1, arg2) {
 
 export function SearchCronTasks(arg1) {
   return window['go']['main']['App']['SearchCronTasks'](arg1);
+}
+
+export function SearchFundCodes(arg1) {
+  return window['go']['main']['App']['SearchFundCodes'](arg1);
 }
 
 export function SearchStock(arg1) {
@@ -466,6 +678,10 @@ export function ShareText(arg1, arg2) {
   return window['go']['main']['App']['ShareText'](arg1, arg2);
 }
 
+export function ShowFromTray() {
+  return window['go']['main']['App']['ShowFromTray']();
+}
+
 export function StockNotice(arg1) {
   return window['go']['main']['App']['StockNotice'](arg1);
 }
@@ -476,6 +692,10 @@ export function StockResearchReport(arg1) {
 
 export function SummaryStockNews(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
   return window['go']['main']['App']['SummaryStockNews'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+}
+
+export function TestMCPServer(arg1) {
+  return window['go']['main']['App']['TestMCPServer'](arg1);
 }
 
 export function UnFollow(arg1) {
@@ -502,8 +722,16 @@ export function UpdateGroupSort(arg1, arg2) {
   return window['go']['main']['App']['UpdateGroupSort'](arg1, arg2);
 }
 
+export function UpdateMCPServer(arg1) {
+  return window['go']['main']['App']['UpdateMCPServer'](arg1);
+}
+
 export function UpdatePromptTemplate(arg1) {
   return window['go']['main']['App']['UpdatePromptTemplate'](arg1);
+}
+
+export function UpdateSkill(arg1) {
+  return window['go']['main']['App']['UpdateSkill'](arg1);
 }
 
 export function UpdateTradingRecord(arg1) {

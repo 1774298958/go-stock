@@ -30,8 +30,11 @@ declare module 'vue' {
     KLineChart: typeof import('./src/components/KLineChart.vue')['default']
     LongTigerRankList: typeof import('./src/components/LongTigerRankList.vue')['default']
     Market: typeof import('./src/components/market.vue')['default']
+    McpServerManager: typeof import('./src/components/mcp-server-manager.vue')['default']
     MoneyTrend: typeof import('./src/components/moneyTrend.vue')['default']
     NewsList: typeof import('./src/components/newsList.vue')['default']
+    PromptPlaza: typeof import('./src/components/promptPlaza.vue')['default']
+    PromptQa: typeof import('./src/components/promptQa.vue')['default']
     PromptTemplateList: typeof import('./src/components/promptTemplateList.vue')['default']
     RankTable: typeof import('./src/components/rankTable.vue')['default']
     ResearchIndex: typeof import('./src/components/researchIndex.vue')['default']
@@ -40,6 +43,7 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     SelectStock: typeof import('./src/components/SelectStock.vue')['default']
     Settings: typeof import('./src/components/settings.vue')['default']
+    SkillManager: typeof import('./src/components/skill-manager.vue')['default']
     Stock: typeof import('./src/components/stock.vue')['default']
     StockChangesMonitor: typeof import('./src/components/stockChangesMonitor.vue')['default']
     Stockhotmap: typeof import('./src/components/stockhotmap.vue')['default']
@@ -53,5 +57,6 @@ declare module 'vue' {
     TChatLoading: typeof import('@tdesign-vue-next/chat')['ChatLoading']
     TChatSender: typeof import('@tdesign-vue-next/chat')['ChatSender']
     TradingRecordManager: typeof import('./src/components/TradingRecordManager.vue')['default']
+    UplimitLadder: typeof import('./src/components/uplimitLadder.vue')['default']
   }
 }

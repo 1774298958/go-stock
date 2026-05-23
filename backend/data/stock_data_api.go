@@ -268,7 +268,7 @@ func (receiver StockBasic) TableName() string {
 
 func NewStockDataApi() *StockDataApi {
 	return &StockDataApi{
-		client: resty.New(),
+		client: SharedHTTPClient,
 		config: GetSettingConfig(),
 	}
 }
@@ -366,6 +366,8 @@ func (receiver StockDataApi) GetStockBaseInfo() {
 }
 
 func (receiver StockDataApi) GetStockCodeRealTimeData(StockCodes ...string) (*[]StockInfo, error) {
+	StockCodes = ConvertTushareCodeToStockCodes(StockCodes)
+
 	stockInfos := make([]StockInfo, 0)
 
 	hkcodes := slice.Filter(StockCodes, func(i int, s string) bool {
@@ -398,6 +400,9 @@ func (receiver StockDataApi) GetStockCodeRealTimeData(StockCodes ...string) (*[]
 			stockData, err := ParseTxStockData(data)
 			if err != nil {
 				logger.SugaredLogger.Error(err.Error())
+				continue
+			}
+			if stockData == nil {
 				continue
 			}
 			stockInfos = append(stockInfos, *stockData)
