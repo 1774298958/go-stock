@@ -2,10 +2,10 @@ package main
 
 import (
 	"bufio"
-	"bytes"
+// 	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/hex"
+// 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"go-stock/backend/agent"
@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/duke-git/lancet/v2/cryptor"
-	"github.com/inconshreveable/go-update"
+// 	"github.com/duke-git/lancet/v2/cryptor"
+// 	"github.com/inconshreveable/go-update"
 	"github.com/samber/lo"
 	"golang.org/x/exp/slices"
 
@@ -163,126 +163,126 @@ func (a *App) CheckSponsorCode(sponsorCode string) map[string]any {
 	}
 }
 
-func (a *App) CheckUpdate(flag int) {
-	sponsorCode := strutil.Trim(a.GetConfig().SponsorCode)
-	if sponsorCode != "" {
-		encrypted, err := hex.DecodeString(sponsorCode)
-		if err != nil {
-			logger.SugaredLogger.Error(err.Error())
-			return
-		}
-		key, err := hex.DecodeString(BuildKey)
-		if err != nil {
-			logger.SugaredLogger.Error(err.Error())
-			return
-		}
-		decrypt := string(cryptor.AesEcbDecrypt(encrypted, key))
-		err = json.Unmarshal([]byte(decrypt), &a.SponsorInfo)
-		if err != nil {
-			logger.SugaredLogger.Error(err.Error())
-			return
-		}
-	}
-
-	releaseVersion := &models.GitHubReleaseVersion{}
-	_, err := resty.New().R().
-		SetResult(releaseVersion).
-		Get("https://api.github.com/repos/ArvinLovegood/go-stock/releases/latest")
-	if err != nil {
-		logger.SugaredLogger.Errorf("get github release version error:%s", err.Error())
-		return
-	}
-	//logger.SugaredLogger.Infof("releaseVersion:%+v", releaseVersion.TagName)
-
-	if _, vipLevel, ok := a.isVip(sponsorCode, "", releaseVersion); ok {
-		level, _ := convertor.ToInt(vipLevel)
-		a.VipLevel = level
-		if level >= 2 {
-			go a.syncNews()
-		}
-	}
-
-	if releaseVersion.TagName != Version {
-		tag := &models.Tag{}
-		_, err = resty.New().R().
-			SetResult(tag).
-			Get("https://api.github.com/repos/ArvinLovegood/go-stock/git/ref/tags/" + releaseVersion.TagName)
-		if err == nil {
-			releaseVersion.Tag = *tag
-		}
-
-		commit := &models.Commit{}
-		_, err = resty.New().R().
-			SetResult(commit).
-			Get(tag.Object.Url)
-		if err == nil {
-			releaseVersion.Commit = *commit
-		}
-
-		// 构建下载链接
-		downloadUrl := fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-windows-amd64.exe", releaseVersion.TagName)
-		if IsMacOS() {
-			downloadUrl = fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-darwin-universal", releaseVersion.TagName)
-		} else if IsLinux() {
-			downloadUrl = fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-linux-amd64", releaseVersion.TagName)
-		}
-		downloadUrl, _, done := a.isVip(sponsorCode, downloadUrl, releaseVersion)
-		if !done {
-			return
-		}
-		go runtime.EventsEmit(a.ctx, "newsPush", map[string]any{
-			"time":    "发现新版本：" + releaseVersion.TagName,
-			"isRed":   true,
-			"source":  "go-stock",
-			"content": fmt.Sprintf("%s", commit.Message),
-		})
-		resp, err := resty.New().R().Get(downloadUrl)
-		if err != nil {
-			go runtime.EventsEmit(a.ctx, "newsPush", map[string]any{
-				"time":    "新版本：" + releaseVersion.TagName,
-				"isRed":   true,
-				"source":  "go-stock",
-				"content": commit.Message + "\n新版本下载失败,请稍后重试或请前往 https://github.com/ArvinLovegood/go-stock/releases 手动下载替换文件。",
-			})
-			return
-		}
-		body := resp.Body()
-
-		if len(body) < 1024*500 {
-			go runtime.EventsEmit(a.ctx, "newsPush", map[string]any{
-				"time":    "新版本：" + releaseVersion.TagName,
-				"isRed":   true,
-				"source":  "go-stock",
-				"content": commit.Message + "\n新版本下载失败,请稍后重试或请前往 https://github.com/ArvinLovegood/go-stock/releases 手动下载替换文件。",
-			})
-			return
-		}
-
-		err = update.Apply(bytes.NewReader(body), update.Options{})
-		if err != nil {
-			logger.SugaredLogger.Error("更新失败: ", err.Error())
-			go runtime.EventsEmit(a.ctx, "updateVersion", releaseVersion)
-			return
-		} else {
-			go runtime.EventsEmit(a.ctx, "newsPush", map[string]any{
-				"time":    "新版本：" + releaseVersion.TagName,
-				"isRed":   true,
-				"source":  "go-stock",
-				"content": "版本更新完成,下次重启软件生效.",
-			})
-		}
-	} else {
-		if flag == 1 {
-			go runtime.EventsEmit(a.ctx, "newsPush", map[string]any{
-				"time":    "当前版本：" + Version,
-				"isRed":   true,
-				"source":  "go-stock",
-				"content": "当前版本无更新",
-			})
-		}
-
-	}
-}
+// func (a *App) CheckUpdate(flag int) {
+// 	sponsorCode := strutil.Trim(a.GetConfig().SponsorCode)
+// 	if sponsorCode != "" {
+// 		encrypted, err := hex.DecodeString(sponsorCode)
+// 		if err != nil {
+// 			logger.SugaredLogger.Error(err.Error())
+// 			return
+// 		}
+// 		key, err := hex.DecodeString(BuildKey)
+// 		if err != nil {
+// 			logger.SugaredLogger.Error(err.Error())
+// 			return
+// 		}
+// 		decrypt := string(cryptor.AesEcbDecrypt(encrypted, key))
+// 		err = json.Unmarshal([]byte(decrypt), &a.SponsorInfo)
+// 		if err != nil {
+// 			logger.SugaredLogger.Error(err.Error())
+// 			return
+// 		}
+// 	}
+//
+// 	releaseVersion := &models.GitHubReleaseVersion{}
+// 	_, err := resty.New().R().
+// 		SetResult(releaseVersion).
+// 		Get("https://api.github.com/repos/ArvinLovegood/go-stock/releases/latest")
+// 	if err != nil {
+// 		logger.SugaredLogger.Errorf("get github release version error:%s", err.Error())
+// 		return
+// 	}
+// 	//logger.SugaredLogger.Infof("releaseVersion:%+v", releaseVersion.TagName)
+//
+// 	if _, vipLevel, ok := a.isVip(sponsorCode, "", releaseVersion); ok {
+// 		level, _ := convertor.ToInt(vipLevel)
+// 		a.VipLevel = level
+// 		if level >= 2 {
+// 			go a.syncNews()
+// 		}
+// 	}
+//
+// 	if releaseVersion.TagName != Version {
+// 		tag := &models.Tag{}
+// 		_, err = resty.New().R().
+// 			SetResult(tag).
+// 			Get("https://api.github.com/repos/ArvinLovegood/go-stock/git/ref/tags/" + releaseVersion.TagName)
+// 		if err == nil {
+// 			releaseVersion.Tag = *tag
+// 		}
+//
+// 		commit := &models.Commit{}
+// 		_, err = resty.New().R().
+// 			SetResult(commit).
+// 			Get(tag.Object.Url)
+// 		if err == nil {
+// 			releaseVersion.Commit = *commit
+// 		}
+//
+// 		// 构建下载链接
+// 		downloadUrl := fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-windows-amd64.exe", releaseVersion.TagName)
+// 		if IsMacOS() {
+// 			downloadUrl = fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-darwin-universal", releaseVersion.TagName)
+// 		} else if IsLinux() {
+// 			downloadUrl = fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-linux-amd64", releaseVersion.TagName)
+// 		}
+// 		downloadUrl, _, done := a.isVip(sponsorCode, downloadUrl, releaseVersion)
+// 		if !done {
+// 			return
+// 		}
+// 		go runtime.EventsEmit(a.ctx, "newsPush", map[string]any{
+// 			"time":    "发现新版本：" + releaseVersion.TagName,
+// 			"isRed":   true,
+// 			"source":  "go-stock",
+// 			"content": fmt.Sprintf("%s", commit.Message),
+// 		})
+// 		resp, err := resty.New().R().Get(downloadUrl)
+// 		if err != nil {
+// 			go runtime.EventsEmit(a.ctx, "newsPush", map[string]any{
+// 				"time":    "新版本：" + releaseVersion.TagName,
+// 				"isRed":   true,
+// 				"source":  "go-stock",
+// 				"content": commit.Message + "\n新版本下载失败,请稍后重试或请前往 https://github.com/ArvinLovegood/go-stock/releases 手动下载替换文件。",
+// 			})
+// 			return
+// 		}
+// 		body := resp.Body()
+//
+// 		if len(body) < 1024*500 {
+// 			go runtime.EventsEmit(a.ctx, "newsPush", map[string]any{
+// 				"time":    "新版本：" + releaseVersion.TagName,
+// 				"isRed":   true,
+// 				"source":  "go-stock",
+// 				"content": commit.Message + "\n新版本下载失败,请稍后重试或请前往 https://github.com/ArvinLovegood/go-stock/releases 手动下载替换文件。",
+// 			})
+// 			return
+// 		}
+//
+// 		err = update.Apply(bytes.NewReader(body), update.Options{})
+// 		if err != nil {
+// 			logger.SugaredLogger.Error("更新失败: ", err.Error())
+// 			go runtime.EventsEmit(a.ctx, "updateVersion", releaseVersion)
+// 			return
+// 		} else {
+// 			go runtime.EventsEmit(a.ctx, "newsPush", map[string]any{
+// 				"time":    "新版本：" + releaseVersion.TagName,
+// 				"isRed":   true,
+// 				"source":  "go-stock",
+// 				"content": "版本更新完成,下次重启软件生效.",
+// 			})
+// 		}
+// 	} else {
+// 		if flag == 1 {
+// 			go runtime.EventsEmit(a.ctx, "newsPush", map[string]any{
+// 				"time":    "当前版本：" + Version,
+// 				"isRed":   true,
+// 				"source":  "go-stock",
+// 				"content": "当前版本无更新",
+// 			})
+// 		}
+//
+// 	}
+// }
 
 func (a *App) isVip(sponsorCode string, downloadUrl string, releaseVersion *models.GitHubReleaseVersion) (string, string, bool) {
     // 直接返回VIP权限，跳过所有验证
@@ -290,15 +290,15 @@ func (a *App) isVip(sponsorCode string, downloadUrl string, releaseVersion *mode
     vipLevel := "2"
 
     // 设置下载链接
-    if IsWindows() {
-        downloadUrl = fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-windows-amd64.exe", releaseVersion.TagName)
-    }
-    if IsMacOS() {
-        downloadUrl = fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-darwin-universal", releaseVersion.TagName)
-    }
-    if IsLinux() {
-        downloadUrl = fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-linux-amd64", releaseVersion.TagName)
-    }
+//     if IsWindows() {
+//         downloadUrl = fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-windows-amd64.exe", releaseVersion.TagName)
+//     }
+//     if IsMacOS() {
+//         downloadUrl = fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-darwin-universal", releaseVersion.TagName)
+//     }
+//     if IsLinux() {
+//         downloadUrl = fmt.Sprintf("https://github.com/ArvinLovegood/go-stock/releases/download/%s/go-stock-linux-amd64", releaseVersion.TagName)
+//     }
 
     return downloadUrl, vipLevel, isVip
 
@@ -625,7 +625,7 @@ func (a *App) domReady(ctx context.Context) {
 	go MonitorFollowedStockCostPrices(a)
 	//检查新版本
 	go func() {
-		a.CheckUpdate(0)
+// 		a.CheckUpdate(0)
 		go a.CheckStockBaseInfo(a.ctx)
 		go syncAllStockInfo(a.ctx)
 
@@ -635,7 +635,7 @@ func (a *App) domReady(ctx context.Context) {
 		})
 		a.cron.AddFunc("30 05 8,12,20 * * *", func() {
 			logger.SugaredLogger.Errorf("Checking for updates...")
-			a.CheckUpdate(0)
+// 			a.CheckUpdate(0)
 		})
 		a.cron.AddFunc("30 05 8,12,20 * * *", func() {
 			syncAllStockInfo(a.ctx)
