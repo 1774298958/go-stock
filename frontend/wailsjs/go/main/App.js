@@ -82,10 +82,6 @@ export function CheckStockBaseInfo(arg1) {
   return window['go']['main']['App']['CheckStockBaseInfo'](arg1);
 }
 
-export function CheckUpdate(arg1) {
-  return window['go']['main']['App']['CheckUpdate'](arg1);
-}
-
 export function ClsCalendar() {
   return window['go']['main']['App']['ClsCalendar']();
 }
