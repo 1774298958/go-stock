@@ -2,20 +2,20 @@
 import {h, onBeforeUnmount, onMounted, ref} from "vue";
 import {
   AddPrompt,
+  CheckSponsorCode,
   DelPrompt,
   ExportConfig,
+  FetchAiModelInfo,
+  FetchAiModels,
   GetConfig,
   GetPromptTemplates,
   SendDingDingMessageByType,
-  UpdateConfig,
-  CheckSponsorCode,
-  FetchAiModels,
-  FetchAiModelInfo
+  UpdateConfig
 } from "../../wailsjs/go/main/App";
-import {NTag, NTooltip, NIcon, useMessage} from "naive-ui";
-import {data, models} from "../../wailsjs/go/models";
+import {NIcon, NTag, NTooltip, useMessage} from "naive-ui";
+import {data} from "../../wailsjs/go/models";
 import {EventsEmit} from "../../wailsjs/runtime";
-import {HelpCircleFilledIcon, HelpIcon} from "tdesign-icons-vue-next";
+import {HelpCircleFilledIcon} from "tdesign-icons-vue-next";
 
 const message = useMessage()
 
@@ -41,8 +41,8 @@ const formValue = ref({
     questionTemplate: "{{stockName}}分析和总结",
     crawlTimeOut: 30,
     kDays: 30,
-    httpProxy:"",
-    httpProxyEnabled:false,
+    httpProxy: "",
+    httpProxyEnabled: false,
   },
   enableDanmu: false,
   browserPath: '',
@@ -52,8 +52,8 @@ const formValue = ref({
   enablePushNews: true,
   enableOnlyPushRedNews: true,
   sponsorCode: "",
-  httpProxy:"",
-  httpProxyEnabled:false,
+  httpProxy: "",
+  httpProxyEnabled: false,
   enableAgent: false,
   qgqpBId: '',
   updateChannel: 'release',
@@ -70,8 +70,8 @@ function addAiConfig() {
     temperature: 0.1,
     maxTokens: 8192,
     timeOut: 6000,
-    httpProxy:"",
-    httpProxyEnabled:false,
+    httpProxy: "",
+    httpProxyEnabled: false,
     thinking: true,
   }));
 }
@@ -84,9 +84,9 @@ function removeAiConfig(index) {
 }
 
 const updateChannelOptions = [
-  { label: 'Release（稳定版）', value: 'release' },
-  { label: 'Pre-release（预发布版）', value: 'pre' },
-  { label: 'Dev（开发版）', value: 'dev' },
+  {label: 'Release（稳定版）', value: 'release'},
+  {label: 'Pre-release（预发布版）', value: 'pre'},
+  {label: 'Dev（开发版）', value: 'dev'},
 ]
 
 async function fetchAiModels(aiConfig) {
@@ -100,7 +100,7 @@ async function fetchAiModels(aiConfig) {
   aiConfig._loadingModels = true
   try {
     const list = await FetchAiModels(aiConfig.baseUrl, aiConfig.apiKey)
-    const options = (list || []).map(id => ({ label: id, value: id }))
+    const options = (list || []).map(id => ({label: id, value: id}))
     aiConfig._modelOptions = options
     if (!aiConfig.modelName && options.length > 0) {
       aiConfig.modelName = options[0].value
@@ -122,23 +122,32 @@ const promptTemplates = ref([])
 const aiConfigExpandedNames = ref([])
 
 const aiPlatformOptions = [
-  { label: 'DeepSeek (https://api.deepseek.com)', value: 'https://api.deepseek.com' },
-  { label: '硅基流动 (https://api.siliconflow.cn/v1)', value: 'https://api.siliconflow.cn/v1' },
-  { label: '智谱AI(GLM) (https://open.bigmodel.cn/api/paas/v4)', value: 'https://open.bigmodel.cn/api/paas/v4' },
-  { label: '字节豆包(火山引擎) (https://ark.cn-beijing.volces.com/api/v3)', value: 'https://ark.cn-beijing.volces.com/api/v3' },
-  { label: '阿里云百炼 (https://dashscope.aliyuncs.com/compatible-mode/v1)', value: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
-  { label: 'Moonshot(月之暗面) (https://api.moonshot.cn/v1)', value: 'https://api.moonshot.cn/v1' },
-  { label: '腾讯混元 (https://api.hunyuan.cloud.tencent.com/v1)', value: 'https://api.hunyuan.cloud.tencent.com/v1' },
-  { label: '讯飞星火 (https://spark-api-open.xf-yun.com/v1)', value: 'https://spark-api-open.xf-yun.com/v1' },
-  { label: '零一万物 (https://api.lingyiwanwu.com/v1)', value: 'https://api.lingyiwanwu.com/v1' },
-  { label: 'MiniMax (https://api.minimax.chat/v1)', value: 'https://api.minimax.chat/v1' },
-  { label: '小米MiMo TokenPlan (https://token-plan-cn.xiaomimimo.com/v1)', value: 'https://token-plan-cn.xiaomimimo.com/v1' },
-  { label: '小米MiMo (https://api.xiaomimimo.com/v1)', value: 'https://api.xiaomimimo.com/v1' },
-  { label: '腾讯云TokenHub (https://tokenhub.tencentmaas.com/v1)', value: 'https://tokenhub.tencentmaas.com/v1' },
-  { label: 'OpenAI (https://api.openai.com/v1)', value: 'https://api.openai.com/v1' },
-  { label: 'Azure OpenAI (https://YOUR_RESOURCE.openai.azure.com)', value: 'https://YOUR_RESOURCE.openai.azure.com' },
-  { label: 'OpenRouter (https://openrouter.ai/api/v1)', value: 'https://openrouter.ai/api/v1' },
-  { label:'Ollama (http://localhost:11434/v1)', value: 'http://localhost:11434/v1' },
+  {label: 'DeepSeek (https://api.deepseek.com)', value: 'https://api.deepseek.com'},
+  {label: '硅基流动 (https://api.siliconflow.cn/v1)', value: 'https://api.siliconflow.cn/v1'},
+  {label: '智谱AI(GLM) (https://open.bigmodel.cn/api/paas/v4)', value: 'https://open.bigmodel.cn/api/paas/v4'},
+  {
+    label: '字节豆包(火山引擎) (https://ark.cn-beijing.volces.com/api/v3)',
+    value: 'https://ark.cn-beijing.volces.com/api/v3'
+  },
+  {
+    label: '阿里云百炼 (https://dashscope.aliyuncs.com/compatible-mode/v1)',
+    value: 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+  },
+  {label: 'Moonshot(月之暗面) (https://api.moonshot.cn/v1)', value: 'https://api.moonshot.cn/v1'},
+  {label: '腾讯混元 (https://api.hunyuan.cloud.tencent.com/v1)', value: 'https://api.hunyuan.cloud.tencent.com/v1'},
+  {label: '讯飞星火 (https://spark-api-open.xf-yun.com/v1)', value: 'https://spark-api-open.xf-yun.com/v1'},
+  {label: '零一万物 (https://api.lingyiwanwu.com/v1)', value: 'https://api.lingyiwanwu.com/v1'},
+  {label: 'MiniMax (https://api.minimax.chat/v1)', value: 'https://api.minimax.chat/v1'},
+  {
+    label: '小米MiMo TokenPlan (https://token-plan-cn.xiaomimimo.com/v1)',
+    value: 'https://token-plan-cn.xiaomimimo.com/v1'
+  },
+  {label: '小米MiMo (https://api.xiaomimimo.com/v1)', value: 'https://api.xiaomimimo.com/v1'},
+  {label: '腾讯云TokenHub (https://tokenhub.tencentmaas.com/v1)', value: 'https://tokenhub.tencentmaas.com/v1'},
+  {label: 'OpenAI (https://api.openai.com/v1)', value: 'https://api.openai.com/v1'},
+  {label: 'Azure OpenAI (https://YOUR_RESOURCE.openai.azure.com)', value: 'https://YOUR_RESOURCE.openai.azure.com'},
+  {label: 'OpenRouter (https://openrouter.ai/api/v1)', value: 'https://openrouter.ai/api/v1'},
+  {label: 'Ollama (http://localhost:11434/v1)', value: 'http://localhost:11434/v1'},
 ]
 
 function getPlatformName(baseUrl) {
@@ -164,7 +173,7 @@ function onModelNameChange(aiConfig, newModelName) {
   if (!newModelName) return
   const platformName = getPlatformName(aiConfig.baseUrl)
   const baseName = platformName || 'AI'
-  
+
   if (!aiConfig.name) {
     aiConfig.name = baseName + '-' + newModelName
   } else if (aiConfig.name === platformName) {
@@ -219,8 +228,8 @@ onMounted(() => {
       questionTemplate: res.questionTemplate ? res.questionTemplate : '{{stockName}}分析和总结',
       crawlTimeOut: res.crawlTimeOut,
       kDays: res.kDays,
-      httpProxy:"",
-      httpProxyEnabled:false,
+      httpProxy: "",
+      httpProxyEnabled: false,
     }
 
 
@@ -232,8 +241,8 @@ onMounted(() => {
     formValue.value.enablePushNews = res.enablePushNews
     formValue.value.enableOnlyPushRedNews = res.enableOnlyPushRedNews
     formValue.value.sponsorCode = res.sponsorCode
-    formValue.value.httpProxy=res.httpProxy;
-    formValue.value.httpProxyEnabled=res.httpProxyEnabled;
+    formValue.value.httpProxy = res.httpProxy;
+    formValue.value.httpProxyEnabled = res.httpProxyEnabled;
     formValue.value.enableAgent = res.enableAgent;
     formValue.value.qgqpBId = res.qgqpBId;
     formValue.value.updateChannel = res.updateChannel || 'release';
@@ -277,8 +286,8 @@ function saveConfig() {
     enablePushNews: formValue.value.enablePushNews,
     enableOnlyPushRedNews: formValue.value.enableOnlyPushRedNews,
     sponsorCode: formValue.value.sponsorCode,
-    httpProxy:formValue.value.httpProxy,
-    httpProxyEnabled:formValue.value.httpProxyEnabled,
+    httpProxy: formValue.value.httpProxy,
+    httpProxyEnabled: formValue.value.httpProxyEnabled,
     enableAgent: formValue.value.enableAgent,
     qgqpBId: formValue.value.qgqpBId,
     updateChannel: formValue.value.updateChannel,
@@ -371,8 +380,8 @@ function importConfig() {
       formValue.value.enablePushNews = config.enablePushNews
       formValue.value.enableOnlyPushRedNews = config.enableOnlyPushRedNews
       formValue.value.sponsorCode = config.sponsorCode
-      formValue.value.httpProxy=config.httpProxy
-      formValue.value.httpProxyEnabled=config.httpProxyEnabled
+      formValue.value.httpProxy = config.httpProxy
+      formValue.value.httpProxyEnabled = config.httpProxyEnabled
       formValue.value.enableAgent = config.enableAgent
       formValue.value.qgqpBId = config.qgqpBId
       formValue.value.updateChannel = config.updateChannel || 'release'
@@ -446,9 +455,9 @@ function deletePrompt(ID) {
       <n-space vertical size="large">
         <n-card :title="() => h(NTag, { type: 'primary', bordered: false }, () => '基础设置')" size="small">
           <n-grid :cols="24" :x-gap="24" style="text-align: left">
-<!--            <n-form-item-gi :span="10" label="Tushare Token：" path="tushareToken">
-              <n-input type="text" placeholder="Tushare api token" v-model:value="formValue.tushareToken" clearable/>
-            </n-form-item-gi>-->
+            <!--            <n-form-item-gi :span="10" label="Tushare Token：" path="tushareToken">
+                          <n-input type="text" placeholder="Tushare api token" v-model:value="formValue.tushareToken" clearable/>
+                        </n-form-item-gi>-->
             <n-form-item-gi :span="4" label="启动时更新基础信息：" path="updateBasicInfoOnStart">
               <n-switch v-model:value="formValue.updateBasicInfoOnStart"/>
             </n-form-item-gi>
@@ -461,21 +470,21 @@ function deletePrompt(ID) {
               <n-switch v-model:value="formValue.darkTheme"/>
             </n-form-item-gi>
             <n-form-item-gi :span="8" label="更新通道：" path="updateChannel">
-              <n-select v-model:value="formValue.updateChannel" :options="updateChannelOptions" />
+              <n-select v-model:value="formValue.updateChannel" :options="updateChannelOptions"/>
               <n-tooltip placement="top">
                 <template #trigger>
                   <n-icon color="#0e7a0d" size="20">
-                    <HelpCircleFilledIcon />
+                    <HelpCircleFilledIcon/>
                   </n-icon>
                 </template>
                 <template #default>
                   <n-gradient-text :type="'warning'">
-                  <div style="max-width: 400px;text-align: left">
-                    更新通道说明：<br>
-                    <b>Release（稳定版）</b>：仅接收正式发布版本，稳定性最高<br>
-                    <b>Pre-release（预发布版）</b>：包含预发布版本，可提前体验新功能<br>
-                    <b>Dev（开发版）</b>：包含所有可用版本，获取最新开发进度
-                  </div>
+                    <div style="max-width: 400px;text-align: left">
+                      更新通道说明：<br>
+                      <b>Release（稳定版）</b>：仅接收正式发布版本，稳定性最高<br>
+                      <b>Pre-release（预发布版）</b>：包含预发布版本，可提前体验新功能<br>
+                      <b>Dev（开发版）</b>：包含所有可用版本，获取最新开发进度
+                    </div>
                   </n-gradient-text>
                 </template>
               </n-tooltip>
@@ -483,7 +492,7 @@ function deletePrompt(ID) {
             <n-form-item-gi :span="10" label="浏览器安装路径：" path="browserPath">
               <n-input type="text" placeholder="浏览器安装路径" v-model:value="formValue.browserPath" clearable/>
             </n-form-item-gi>
-           <n-form-item-gi :span="3" label="指数基金：" path="enableFund">
+            <n-form-item-gi :span="3" label="指数基金：" path="enableFund">
               <n-switch v-model:value="formValue.enableFund"/>
             </n-form-item-gi>
             <!--      <n-form-item-gi :span="3" label="AI智能体：" path="enableAgent">
@@ -494,104 +503,107 @@ function deletePrompt(ID) {
               <n-tooltip placement="top">
                 <template #trigger>
                   <n-icon color="#0e7a0d" size="20">
-                    <HelpCircleFilledIcon />
+                    <HelpCircleFilledIcon/>
                   </n-icon>
                 </template>
                 <template #default>
                   <n-gradient-text :type="'warning'">
-                  <div style="max-width: 400px;text-align: left">
-                    获取方法：<br>
-                    打开浏览器,访问东财网站，<br>
-                    按F12打开开发人员工具-》网络面板，<br>
-                    随便点开一个请求，复制请求cookie中qgqp_b_id对应的值。
-                  </div>
+                    <div style="max-width: 400px;text-align: left">
+                      获取方法：<br>
+                      打开浏览器,访问东财网站，<br>
+                      按F12打开开发人员工具-》网络面板，<br>
+                      随便点开一个请求，复制请求cookie中qgqp_b_id对应的值。
+                    </div>
                   </n-gradient-text>
                 </template>
               </n-tooltip>
             </n-form-item-gi>
 
             <n-form-item-gi :span="11" label="问财API密钥：" path="iwencaiApiKey">
-              <n-input type="password" placeholder="同花顺问财开放平台API Key" v-model:value="formValue.iwencaiApiKey" clearable show-password-on="click"/>
+              <n-input type="password" placeholder="同花顺问财开放平台API Key" v-model:value="formValue.iwencaiApiKey"
+                       clearable show-password-on="click"/>
               <n-tooltip placement="top">
                 <template #trigger>
                   <n-icon color="#0e7a0d" size="20">
-                    <HelpCircleFilledIcon />
+                    <HelpCircleFilledIcon/>
                   </n-icon>
                 </template>
                 <template #default>
                   <n-gradient-text :type="'warning'">
-                  <div style="max-width: 400px;text-align: left">
-                    获取方法：<br>
-                    访问同花顺问财开放平台：<br>
-                    <a href="https://open.iwencai.com" target="_blank" style="color: #63e2b7">https://www.iwencai.com/skillhub</a><br>
-                    注册并登录后，在控制台获取API Key。<br>
-                    配置后可使用问财智能选股、行情查询、研报搜索等功能。
-                  </div>
+                    <div style="max-width: 400px;text-align: left">
+                      获取方法：<br>
+                      访问同花顺问财开放平台：<br>
+                      <a href="https://open.iwencai.com" target="_blank" style="color: #63e2b7">https://www.iwencai.com/skillhub</a><br>
+                      注册并登录后，在控制台获取API Key。<br>
+                      配置后可使用问财智能选股、行情查询、研报搜索等功能。
+                    </div>
                   </n-gradient-text>
                 </template>
               </n-tooltip>
             </n-form-item-gi>
 
             <n-form-item-gi :span="11" label="东财AI密钥：" path="emApiKey">
-              <n-input type="password" placeholder="东方财富AI SaaS API Key" v-model:value="formValue.emApiKey" clearable show-password-on="click"/>
+              <n-input type="password" placeholder="东方财富AI SaaS API Key" v-model:value="formValue.emApiKey"
+                       clearable show-password-on="click"/>
               <n-tooltip placement="top">
                 <template #trigger>
                   <n-icon color="#0e7a0d" size="20">
-                    <HelpCircleFilledIcon />
+                    <HelpCircleFilledIcon/>
                   </n-icon>
                 </template>
                 <template #default>
                   <n-gradient-text :type="'warning'">
-                  <div style="max-width: 400px;text-align: left">
-                    获取方法：<br>
-                    访问东方财富妙想AI平台获取API Key。
-                    https://ai.eastmoney.com/mxClaw<br>
-                    配置后可使用个股业绩点评功能。
-                  </div>
+                    <div style="max-width: 400px;text-align: left">
+                      获取方法：<br>
+                      访问东方财富妙想AI平台获取API Key。
+                      https://ai.eastmoney.com/mxClaw<br>
+                      配置后可使用个股业绩点评功能。
+                    </div>
                   </n-gradient-text>
                 </template>
               </n-tooltip>
             </n-form-item-gi>
 
-            <n-form-item-gi :span="11" label="赞助码：" path="sponsorCode">
-              <n-input-group>
-                <n-input :show-count="true" placeholder="联系作者QQ或微信获取，激活VIP功能" v-model:value="formValue.sponsorCode">
-                </n-input>
-                <n-button type="success" secondary strong
-                          @click="CheckSponsorCode(formValue.sponsorCode).then((res) => {message.warning(res.msg)})">验证
-                </n-button>
-                <n-popover trigger="hover" placement="top">
-                  <template #trigger>
-                    <n-icon color="#0e7a0d" size="20">
-                      <HelpCircleFilledIcon />
-                    </n-icon>
-                  </template>
-                  <n-gradient-text :type="'warning'">
-                    <div style="max-width: 400px;text-align: left">
-                      赞助码获取方式：<br>
-                      联系作者获取赞助码，激活VIP功能<br>
-                      享受更多高级功能和优先支持
-                    </div>
-                  </n-gradient-text>
-                </n-popover>
-              </n-input-group>
-            </n-form-item-gi>
+            <!--            <n-form-item-gi :span="11" label="赞助码：" path="sponsorCode">-->
+            <!--              <n-input-group>-->
+            <!--                <n-input :show-count="true" placeholder="联系作者QQ或微信获取，激活VIP功能" v-model:value="formValue.sponsorCode">-->
+            <!--                </n-input>-->
+            <!--                <n-button type="success" secondary strong-->
+            <!--                          @click="CheckSponsorCode(formValue.sponsorCode).then((res) => {message.warning(res.msg)})">验证-->
+            <!--                </n-button>-->
+            <!--                <n-popover trigger="hover" placement="top">-->
+            <!--                  <template #trigger>-->
+            <!--                    <n-icon color="#0e7a0d" size="20">-->
+            <!--                      <HelpCircleFilledIcon />-->
+            <!--                    </n-icon>-->
+            <!--                  </template>-->
+            <!--                  <n-gradient-text :type="'warning'">-->
+            <!--                    <div style="max-width: 400px;text-align: left">-->
+            <!--                      赞助码获取方式：<br>-->
+            <!--                      联系作者获取赞助码，激活VIP功能<br>-->
+            <!--                      享受更多高级功能和优先支持-->
+            <!--                    </div>-->
+            <!--                  </n-gradient-text>-->
+            <!--                </n-popover>-->
+            <!--              </n-input-group>-->
+            <!--            </n-form-item-gi>-->
 
             <n-form-item-gi :span="11" label="提示词广场地址：" path="promptPlazaApiBase">
-              <n-input type="text" placeholder="http://go-stock.sparkmemory.top:1918/api" v-model:value="formValue.promptPlazaApiBase" clearable/>
+              <n-input type="text" placeholder="http://go-stock.sparkmemory.top:1918/api"
+                       v-model:value="formValue.promptPlazaApiBase" clearable/>
               <n-tooltip placement="top">
                 <template #trigger>
                   <n-icon color="#0e7a0d" size="20">
-                    <HelpCircleFilledIcon />
+                    <HelpCircleFilledIcon/>
                   </n-icon>
                 </template>
                 <template #default>
                   <n-gradient-text :type="'warning'">
-                  <div style="max-width: 400px;text-align: left">
-                    提示词广场服务接口地址<br>
-                    默认: http://go-stock.sparkmemory.top:1918/api<br>
-                    如已部署提示词广场服务，可修改为实际地址
-                  </div>
+                    <div style="max-width: 400px;text-align: left">
+                      提示词广场服务接口地址<br>
+                      默认: http://go-stock.sparkmemory.top:1918/api<br>
+                      如已部署提示词广场服务，可修改为实际地址
+                    </div>
                   </n-gradient-text>
                 </template>
               </n-tooltip>
@@ -616,7 +628,8 @@ function deletePrompt(ID) {
             <n-form-item-gi :span="3" label="市场资讯提醒：" path="enablePushNews">
               <n-switch v-model:value="formValue.enablePushNews"/>
             </n-form-item-gi>
-            <n-form-item-gi v-if="formValue.enablePushNews" :span="4" label="只提醒红字或关注个股的新闻：" path="enableOnlyPushRedNews">
+            <n-form-item-gi v-if="formValue.enablePushNews" :span="4" label="只提醒红字或关注个股的新闻："
+                            path="enableOnlyPushRedNews">
               <n-switch v-model:value="formValue.enableOnlyPushRedNews"/>
             </n-form-item-gi>
 
@@ -672,7 +685,8 @@ function deletePrompt(ID) {
             <n-gi :span="24" v-if="formValue.openAI.enable">
               <n-space vertical>
                 <n-collapse v-model:expanded-names="aiConfigExpandedNames" accordion>
-                  <n-collapse-item v-for="(aiConfig, index) in formValue.openAI.aiConfigs" :key="index" :name="String(index)">
+                  <n-collapse-item v-for="(aiConfig, index) in formValue.openAI.aiConfigs" :key="index"
+                                   :name="String(index)">
                     <template #header>
                       <n-flex justify="space-between" align="center" style="width: 100%;">
                         <n-text>{{ aiConfig.name || `AI 配置 #${index + 1}` }}</n-text>
@@ -680,7 +694,9 @@ function deletePrompt(ID) {
                       </n-flex>
                     </template>
                     <template #header-extra>
-                      <n-button type="error" size="tiny" ghost @click.stop="removeAiConfig(index)" style="margin-right: 8px;">删除</n-button>
+                      <n-button type="error" size="tiny" ghost @click.stop="removeAiConfig(index)"
+                                style="margin-right: 8px;">删除
+                      </n-button>
                     </template>
                     <n-grid :cols="24" :x-gap="24">
                       <n-form-item-gi :span="24" hidden label="配置ID" :path="`openAI.aiConfigs[${index}].ID`">
@@ -691,13 +707,13 @@ function deletePrompt(ID) {
                       </n-form-item-gi>
                       <n-form-item-gi :span="12" label="接口地址" :path="`openAI.aiConfigs[${index}].baseUrl`">
                         <n-select
-                          v-model:value="aiConfig.baseUrl"
-                          :options="aiPlatformOptions"
-                          filterable
-                          tag
-                          clearable
-                          placeholder="选择或输入AI接口地址"
-                          @update:value="(val) => onBaseUrlChange(aiConfig, val)"
+                            v-model:value="aiConfig.baseUrl"
+                            :options="aiPlatformOptions"
+                            filterable
+                            tag
+                            clearable
+                            placeholder="选择或输入AI接口地址"
+                            @update:value="(val) => onBaseUrlChange(aiConfig, val)"
                         />
                       </n-form-item-gi>
                       <n-form-item-gi :span="12" label="令牌(apiKey)" :path="`openAI.aiConfigs[${index}].apiKey`">
@@ -706,14 +722,14 @@ function deletePrompt(ID) {
                       </n-form-item-gi>
                       <n-form-item-gi :span="8" label="模型名称" :path="`openAI.aiConfigs[${index}].modelName`">
                         <n-select
-                          v-model:value="aiConfig.modelName"
-                          :options="aiConfig._modelOptions || []"
-                          filterable
-                          tag
-                          :loading="aiConfig._loadingModels"
-                          placeholder="点击获取模型列表或手动输入"
-                          @click="fetchAiModels(aiConfig)"
-                          @update:value="(val) => onModelNameChange(aiConfig, val)"
+                            v-model:value="aiConfig.modelName"
+                            :options="aiConfig._modelOptions || []"
+                            filterable
+                            tag
+                            :loading="aiConfig._loadingModels"
+                            placeholder="点击获取模型列表或手动输入"
+                            @click="fetchAiModels(aiConfig)"
+                            @update:value="(val) => onModelNameChange(aiConfig, val)"
                         />
                       </n-form-item-gi>
                       <n-form-item-gi :span="5" label="Temperature" :path="`openAI.aiConfigs[${index}].temperature`">
@@ -730,16 +746,16 @@ function deletePrompt(ID) {
                         <n-tooltip placement="top">
                           <template #trigger>
                             <n-icon color="#0e7a0d" size="20" style="margin-left: 8px;">
-                              <HelpCircleFilledIcon />
+                              <HelpCircleFilledIcon/>
                             </n-icon>
                           </template>
                           <template #default>
                             <n-gradient-text :type="'warning'">
-                            <div style="max-width: 400px;text-align: left">
-                              启用深度思考模式：<br>
-                              适用于 DeepSeek-Reasoner、MiMo-V2.5-Pro 等支持推理的模型。<br>
-                              如使用普通模型请关闭此选项
-                            </div>
+                              <div style="max-width: 400px;text-align: left">
+                                启用深度思考模式：<br>
+                                适用于 DeepSeek-Reasoner、MiMo-V2.5-Pro 等支持推理的模型。<br>
+                                如使用普通模型请关闭此选项
+                              </div>
                             </n-gradient-text>
                           </template>
                         </n-tooltip>
@@ -747,7 +763,8 @@ function deletePrompt(ID) {
                       <n-form-item-gi :span="12" label="http代理" :path="`openAI.aiConfigs[${index}].httpProxyEnabled`">
                         <n-switch v-model:value="aiConfig.httpProxyEnabled"/>
                       </n-form-item-gi>
-                      <n-form-item-gi :span="12" v-if="aiConfig.httpProxyEnabled" title="http代理地址" :path="`openAI.aiConfigs[${index}].httpProxy`">
+                      <n-form-item-gi :span="12" v-if="aiConfig.httpProxyEnabled" title="http代理地址"
+                                      :path="`openAI.aiConfigs[${index}].httpProxy`">
                         <n-input type="text" placeholder="http代理地址" v-model:value="aiConfig.httpProxy" clearable/>
                       </n-form-item-gi>
                     </n-grid>
@@ -764,21 +781,21 @@ function deletePrompt(ID) {
             <n-gi :span="24">
               <n-space vertical>
                 <n-space justify="center">
-<!--                  <n-button type="warning" @click="managePrompts">管理提示词模板</n-button>-->
+                  <!--                  <n-button type="warning" @click="managePrompts">管理提示词模板</n-button>-->
                   <n-button type="primary" strong @click="saveConfig">保存设置</n-button>
                   <n-button type="info" @click="exportConfig">导出配置</n-button>
                   <n-button type="error" @click="importConfig">导入配置</n-button>
                 </n-space>
 
-<!--                <n-flex justify="start" style="margin-top: 10px" v-if="promptTemplates.length > 0">-->
-<!--                  <n-tag :bordered="false" type="warning">提示词模板:</n-tag>-->
-<!--                  <n-tag size="medium" secondary v-for="prompt in promptTemplates" closable-->
-<!--                         @close="deletePrompt(prompt.ID)" @click="editPrompt(prompt)" :title="prompt.content"-->
-<!--                         :type="prompt.type === '模型系统Prompt' ? 'success' : 'info'" :bordered="false">{{-->
-<!--                      prompt.name-->
-<!--                    }}-->
-<!--                  </n-tag>-->
-<!--                </n-flex>-->
+                <!--                <n-flex justify="start" style="margin-top: 10px" v-if="promptTemplates.length > 0">-->
+                <!--                  <n-tag :bordered="false" type="warning">提示词模板:</n-tag>-->
+                <!--                  <n-tag size="medium" secondary v-for="prompt in promptTemplates" closable-->
+                <!--                         @close="deletePrompt(prompt.ID)" @click="editPrompt(prompt)" :title="prompt.content"-->
+                <!--                         :type="prompt.type === '模型系统Prompt' ? 'success' : 'info'" :bordered="false">{{-->
+                <!--                      prompt.name-->
+                <!--                    }}-->
+                <!--                  </n-tag>-->
+                <!--                </n-flex>-->
               </n-space>
             </n-gi>
 
