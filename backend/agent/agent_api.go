@@ -314,7 +314,8 @@ func runReact(ctx context.Context, stockAiAgent *StockAiAgent, messages []*schem
 }
 
 func runPlanExecuteWithFallback(ctx context.Context, stockAiAgent *StockAiAgent, messages []*schema.Message, ch chan *schema.Message, memoryService *ChatMemoryService, historyMessages []*schema.Message, sysPrompt string, question string) {
-	defer close(ch)
+	// 注意：不在这里 defer close(ch)，因为降级时 runReactWithAgent 会关闭 channel
+	// 如果 PlanExecute 成功，会在最后关闭；如果降级，由 runReactWithAgent 关闭
 
 	// 首先尝试 PlanExecute 模式
 	planExecuteSuccess := tryPlanExecute(ctx, stockAiAgent, messages, ch, memoryService)
@@ -326,7 +327,7 @@ func runPlanExecuteWithFallback(ctx context.Context, stockAiAgent *StockAiAgent,
 		safeSend(ch, &schema.Message{
 			Role:             schema.Assistant,
 			Content:          "",
-			ReasoningContent: "[FALLBACK]⚠️ 检测到编码问题，切换到标准分析模式...\n",
+			ReasoningContent: "[FALLBACK]⚠️ 检测到问题，切换到标准分析模式...\n",
 		})
 
 		// 创建临时的 React Agent
@@ -338,7 +339,11 @@ func runPlanExecuteWithFallback(ctx context.Context, stockAiAgent *StockAiAgent,
 				Role:    schema.Assistant,
 				Content: "❌ 无法创建备用分析引擎，请稍后重试",
 			})
+			close(ch) // 只有在这里才需要手动关闭
 		}
+	} else {
+		// PlanExecute 成功，关闭 channel
+		close(ch)
 	}
 }
 
@@ -381,6 +386,12 @@ func tryPlanExecute(ctx context.Context, stockAiAgent *StockAiAgent, messages []
 				strings.Contains(event.Err.Error(), "invalid char") ||
 				strings.Contains(event.Err.Error(), "UTF-8") {
 				logger.SugaredLogger.Warnf("检测到编码错误，触发降级机制")
+				return false // 触发降级
+			}
+
+			// 检查是否是 no tool call 错误，触发降级到 React 模式
+			if strings.Contains(event.Err.Error(), "no tool call") {
+				logger.SugaredLogger.Warnf("检测到 no tool call 错误，触发降级到 React 模式")
 				return false // 触发降级
 			}
 
@@ -466,13 +477,38 @@ func tryPlanExecute(ctx context.Context, stockAiAgent *StockAiAgent, messages []
 }
 
 func createFallbackReactAgent(ctx context.Context, stockAiAgent *StockAiAgent) *react.Agent {
-	// 从 PlanExecute Agent 中提取原始配置来创建 React Agent
-	// 这里需要重新创建，因为我们没有保存原始的 chatModel 和 tools
+	// 当 PlanExecute 失败时，创建一个新的 React Agent 作为降级方案
+	logger.SugaredLogger.Infof("正在创建降级用的 React Agent...")
 
-	// 为了简化，我们返回 nil，让上层处理
-	// 在实际生产环境中，应该保存原始配置或重新创建
-	logger.SugaredLogger.Warnf("暂不支持降级到 React 模式，需要重新实现")
-	return nil
+	// 获取当前配置
+	settingConfig := data.GetSettingConfig()
+	if settingConfig == nil {
+		logger.SugaredLogger.Errorf("settingConfig is nil")
+		return nil
+	}
+
+	// 使用第一个 AI 配置
+	var aiConfig *data.AIConfig
+	for _, config := range settingConfig.AiConfigs {
+		aiConfig = config
+		break
+	}
+
+	if aiConfig == nil {
+		logger.SugaredLogger.Errorf("no ai config found")
+		return nil
+	}
+
+	// 重新创建 React Agent
+	question := "fallback"
+	agentInstance := GetStockAiAgent(&ctx, *aiConfig, question, string(AgentModeReact))
+	if agentInstance == nil || agentInstance.ReactAgent == nil {
+		logger.SugaredLogger.Errorf("failed to create fallback React Agent")
+		return nil
+	}
+
+	logger.SugaredLogger.Infof("成功创建降级 React Agent")
+	return agentInstance.ReactAgent
 }
 
 func runReactWithAgent(ctx context.Context, reactAgent *react.Agent, messages []*schema.Message, ch chan *schema.Message, memoryService *ChatMemoryService, historyMessages []*schema.Message, sysPrompt string, question string) {

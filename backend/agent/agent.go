@@ -145,6 +145,8 @@ func createReactAgent(ctx context.Context, chatModel model.ToolCallingChatModel,
 			return compressMessages(input, maxTokens)
 		},
 		StreamToolCallChecker: func(ctx context.Context, modelOutput *schema.StreamReader[*schema.Message]) (bool, error) {
+			// 允许模型选择不调用工具，直接返回文本响应
+			// 这样即使模型没有调用工具，也不会报错
 			hasToolCall := false
 			for {
 				msg, err := modelOutput.Recv()
@@ -155,6 +157,8 @@ func createReactAgent(ctx context.Context, chatModel model.ToolCallingChatModel,
 					hasToolCall = true
 				}
 			}
+			// 不再强制要求必须有tool call，让模型自由选择
+			logger.SugaredLogger.Infof("StreamToolCallChecker: hasToolCall=%v", hasToolCall)
 			return hasToolCall, nil
 		},
 	})
@@ -497,8 +501,8 @@ func genPlannerInput(ctx context.Context, userInput []adk.Message) ([]adk.Messag
 	systemMsg := schema.SystemMessage(`你是股票分析规划师。将用户目标拆解为3-4步执行计划。
 规则：步骤具体独立、按最优顺序、无冗余，末步须产出完整答案。
 
-【重要】你必须且只能通过内置函数/工具「plan」输出计划：调用 plan，参数为 JSON，字段 steps 为字符串数组。
-禁止仅用自然语言或 Markdown 列出步骤（那样无法被系统解析）；不要输出未包裹在 plan 工具调用里的步骤列表。`)
+【推荐做法】建议使用「plan」工具输出计划：调用 plan，参数为 JSON，字段 steps 为字符串数组。
+如果无法使用工具，也可以用自然语言描述计划步骤。`)
 
 	userMsg := schema.UserMessage(question)
 
@@ -1025,17 +1029,15 @@ func genReplannerInput(ctx context.Context, in *planexecute.ExecutionContext) ([
 
 	systemMsg := schema.SystemMessage(`审核执行进度并决定下一步。
 
-【重要】你必须严格遵守以下规则：
-1. 只有当所有计划步骤均已执行完毕时，才能调用 respond 工具输出最终结论
-2. 如果还有未执行的步骤，必须调用 plan 工具继续执行剩余步骤
-3. 即使你认为已能推断出结论，也不允许跳过未执行步骤
-4. 判定标准：看下面的"剩余未执行步骤"部分——有内容就必须调用 plan，显示"所有计划步骤已执行完毕"才调用 respond
+【推荐做法】
+1. 如果还有未执行的步骤，建议调用「plan」工具继续执行
+2. 如果所有步骤已完成，可以调用「respond」工具输出最终结论
+3. 你也可以选择直接回复，说明当前进度和下一步计划
 
-你只能二选一，且必须通过工具调用（function calling）完成：
-- 若还有未执行步骤：调用「plan」，参数 JSON 含字段 steps（剩余未完成步骤的字符串数组）
-- 若所有步骤已完成：调用「respond」，参数 JSON 含字段 response（完整最终答复）
-
-不要描述「我将调用 plan」；必须实际发出 plan 或 respond 工具调用。`)
+可用选项：
+- 调用「plan」工具：参数为 JSON，含字段 steps（剩余未完成步骤的字符串数组）
+- 调用「respond」工具：参数为 JSON，含字段 response（完整最终答复）
+- 直接回复：用自然语言说明当前状态和建议`)
 
 	userMsg := schema.UserMessage(fmt.Sprintf("目标: %s\n\n原始计划: %s\n\n已完成步骤:\n%s\n\n剩余未执行步骤:\n%s",
 		question, string(planContent), stepsContent.String(), remainingStepsStr))
