@@ -1,18 +1,17 @@
 <script setup>
-import {h, onMounted, onUnmounted, reactive, ref} from 'vue'
+import {h, onMounted, onUnmounted, ref, reactive} from 'vue'
 import {
   AddTradingRecord,
-  CheckFrequentTrading,
-  DeleteTradingRecord,
-  GetAllStockInfoList,
-  GetConfig,
-  GetStockRealTimePrice,
   GetTradingRecordList,
   GetTradingRecordStatistics,
-  UpdateTradingRecord
+  UpdateTradingRecord,
+  DeleteTradingRecord,
+  CheckFrequentTrading,
+  GetAllStockInfoList,
+  GetStockRealTimePrice,
+  GetConfig
 } from '../../wailsjs/go/main/App'
 import {
-  NAutoComplete,
   NButton,
   NDataTable,
   NDatePicker,
@@ -33,6 +32,7 @@ import {
   useNotification
 } from 'naive-ui'
 import StockLightweightKlineChart from "./StockLightweightKlineChart.vue";
+import {GetEffectiveSponsorVip} from '../../wailsjs/go/main/App'
 
 const message = useMessage()
 const notify = useNotification()
@@ -764,7 +764,8 @@ onUnmounted(() => {
       style="height: calc(100vh - 310px); margin-top: 10px"
   />
 
-  <n-modal v-model:show="showAddModal" preset="card" title="添加交易日志" style="width: 820px;max-width: calc(100vw - 32px);">
+  <n-modal v-model:show="showAddModal" preset="card" title="添加交易日志"
+           style="width: 820px;max-width: calc(100vw - 32px);">
     <n-form label-placement="top" size="small">
       <n-grid :cols="3" :x-gap="12" :y-gap="2">
         <n-grid-item>
@@ -856,7 +857,8 @@ onUnmounted(() => {
     </template>
   </n-modal>
 
-  <n-modal v-model:show="showEditModal" preset="card" title="编辑交易日志" style="width: 820px;max-width: calc(100vw - 32px);">
+  <n-modal v-model:show="showEditModal" preset="card" title="编辑交易日志"
+           style="width: 820px;max-width: calc(100vw - 32px);">
     <n-form label-placement="top" size="small">
       <n-grid :cols="3" :x-gap="12" :y-gap="2">
         <n-grid-item>

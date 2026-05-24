@@ -15,10 +15,11 @@ const alipay = ref('https://github.com/ArvinLovegood/go-stock/raw/master/build/s
 const wxpay = ref('https://github.com/ArvinLovegood/go-stock/raw/master/build/screenshot/wxpay.jpg')
 const wxgzh = ref('https://github.com/ArvinLovegood/go-stock/raw/dev/build/screenshot/%E6%89%AB%E7%A0%81_%E6%90%9C%E7%B4%A2%E8%81%94%E5%90%88%E4%BC%A0%E6%92%AD%E6%A0%B7%E5%BC%8F-%E7%99%BD%E8%89%B2%E7%89%88.png')
 const notify = useNotification()
-const vipLevel = ref("");
-const vipStartTime = ref("");
-const vipEndTime = ref("");
-const expired = ref(false)
+// VIP相关变量已保留但不再使用，仅用于显示兼容性
+// const vipLevel = ref("");
+// const vipStartTime = ref("");
+// const vipEndTime = ref("");
+// const expired = ref(false)
 
 onMounted(() => {
   document.title = '关于软件';
@@ -30,18 +31,18 @@ onMounted(() => {
     wxpay.value = res.wxpay;
     wxgzh.value = res.wxgzh;
 
-    GetSponsorInfo().then((res) => {
-      vipLevel.value = res.vipLevel;
-      vipStartTime.value = res.vipStartTime;
-      vipEndTime.value = res.vipEndTime;
-      //判断时间是否到期
-      if (res.vipLevel) {
-        if (res.vipEndTime < format(new Date(), 'yyyy-MM-dd HH:mm:ss')) {
-          notify.warning({content: 'VIP已到期'})
-          expired.value = true;
-        }
-      }
-    })
+    // VIP检查已移除，不再获取和显示VIP状态
+    // GetSponsorInfo().then((res) => {
+    //   vipLevel.value = res.vipLevel;
+    //   vipStartTime.value = res.vipStartTime;
+    //   vipEndTime.value = res.vipEndTime;
+    //   if (res.vipLevel) {
+    //     if (res.vipEndTime < format(new Date(), 'yyyy-MM-dd HH:mm:ss')) {
+    //       notify.warning({content: 'VIP已到期'})
+    //       expired.value = true;
+    //     }
+    //   }
+    // })
 
   });
 

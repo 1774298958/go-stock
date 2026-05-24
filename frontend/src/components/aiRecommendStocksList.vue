@@ -4,53 +4,43 @@ import {
   DeleteAiRecommendStocks,
   GetAiRecommendStocksList,
   GetConfig,
+  GetSponsorInfo,
   UpdateAiRecommendStocksAlert
 } from "../../wailsjs/go/main/App";
 import {NButton, NSwitch, NTag, NText, useMessage, useNotification} from "naive-ui";
 import StockLightweightKlineChart from "./StockLightweightKlineChart.vue";
 import sparkLine from "./stockSparkLine.vue"
+import {format} from "date-fns";
 
 const notify = useNotification()
-const vipLevel = ref("");
-const vipStartTime = ref("");
-const vipEndTime = ref("");
-const expired = ref(false)
-const isValidVip = ref(true) // 是否是会员
+// VIP检查已移除，所有用户都可使用完整功能
+// const vipLevel = ref("");
+// const vipStartTime = ref("");
+// const vipEndTime = ref("");
+// const expired = ref(false)
+const isValidVip = ref(true) // 所有用户都视为有效VIP
 
-onBeforeMount(() => {
-  GetConfig().then(result => {
-    if (result.darkTheme) {
-      editorDataRef.darkTheme = true
-    }
-  })
-  // 使用 GetEffectiveSponsorVip 获取VIP状态(已修改为始终返回VIP2)
-  GetEffectiveSponsorVip().then((res) => {
-    vipLevel.value = res.vipLevel || 2;
-    expired.value = false;
-    isValidVip.value = true;
-  }).catch(() => {
-    // 如果失败，默认给予VIP权限
-    vipLevel.value = 2;
-    expired.value = false;
-    isValidVip.value = true;
-  })
-  // GetSponsorInfo().then((res) => {
-  //   // console.log(res)
-  //   vipLevel.value = res.vipLevel;
-  //   vipStartTime.value = res.vipStartTime;
-  //   vipEndTime.value = res.vipEndTime;
-  //   //判断时间是否到期
-  //   if (res.vipLevel) {
-  //     if (res.vipEndTime < format(new Date(), 'yyyy-MM-dd HH:mm:ss')) {
-  //       //notify.warning({content: 'VIP已到期'})
-  //       expired.value = true;
-  //     }
-  //   } else {
-  //     //notify.success({content: '未开通VIP'})
-  //   }
-  //   isValidVip.value = !(vipLevel.value === "" || Number(vipLevel.value) <= 0);
-  // })
-})
+// onBeforeMount(() => {
+//   GetConfig().then(result => {
+//     if (result.darkTheme) {
+//       editorDataRef.darkTheme = true
+//     }
+//   })
+
+//   GetSponsorInfo().then((res) => {
+//     vipLevel.value = res.vipLevel;
+//     vipStartTime.value = res.vipStartTime;
+//     vipEndTime.value = res.vipEndTime;
+//     if (res.vipLevel) {
+//       if (res.vipEndTime < format(new Date(), 'yyyy-MM-dd HH:mm:ss')) {
+//         expired.value = true;
+//       }
+//     } else {
+//       //notify.success({content: '未开通VIP'})
+//     }
+//     isValidVip.value = !(vipLevel.value === "" || Number(vipLevel.value) <= 0);
+//   })
+// })
 onMounted(() => {
   query({
     page: 1,
@@ -223,15 +213,17 @@ const columnsRef = ref([
         }, {default: () => "Buy"})]
       }
       return h(NText, {type: "info"}, {default: () => row.recommendBuyPrice})
+
     }
   },
   {
     title: '止盈价',
     key: 'recommendStopProfitPrice',
     render(row, index) {
-      if (vipLevel.value === "" || Number(vipLevel.value) <= 0) {
-        return h(NText, {type: "info"}, {default: () => row.recommendStopProfitPrice})
-      }
+      // VIP检查已移除，所有用户都可使用完整功能
+      // if (vipLevel.value === "" || Number(vipLevel.value) <= 0) {
+      //   return h(NText, {type: "info"}, {default: () => row.recommendStopProfitPrice})
+      // }
       if (row.recommendStopProfitPrice.includes("-")) {
         let prices = row.recommendStopProfitPrice.split("-")
         if (Number(row.stockCurrentPrice) >= Number(prices[0]) && Number(row.stockCurrentPrice) <= Number(prices[1])) {
@@ -257,9 +249,10 @@ const columnsRef = ref([
     title: '止损价',
     key: 'recommendStopLossPrice',
     render(row, index) {
-      if (vipLevel.value === "" || Number(vipLevel.value) <= 0) {
-        return h(NText, {type: "info"}, {default: () => row.recommendStopLossPrice})
-      }
+      // VIP检查已移除，所有用户都可使用完整功能
+      // if (vipLevel.value === "" || Number(vipLevel.value) <= 0) {
+      //   return h(NText, {type: "info"}, {default: () => row.recommendStopLossPrice})
+      // }
       if (row.recommendStopLossPrice.includes("-")) {
         let prices = row.recommendStopLossPrice.split("-")
         if (Number(row.stockCurrentPrice) <= Number(prices[0])) {
@@ -484,7 +477,7 @@ function recommendRangeToSinglePrice(p) {
 }
 
 function showDetail(row) {
-  // if (vipLevel.value === "" || Number(vipLevel.value) <= 0) {
+  // if(vipLevel.value===""|| Number(vipLevel.value) <=0){
   //   notify.warning({content: '未开通VIP或者已经过期'})
   //   return
   // }
@@ -550,17 +543,17 @@ function toggleAlert(row, newEnableAlert) {
   />
 
   <n-modal v-model:show="modalDataRef.visible" :title="modalDataRef.title" preset="card" style="max-width: 1400px;">
-    <n-gradient-text :size="16" type="warning">{{modalDataRef.remarks}}</n-gradient-text>
+    <n-gradient-text :size="16" type="warning">{{ modalDataRef.remarks }}</n-gradient-text>
     <n-card size="small">
       <StockLightweightKlineChart
-        style="width: 100%;"
-        :code="modalDataRef.stockCode"
-        :chart-height="350"
-        :stock-name="modalDataRef.stockName"
-        :dark-theme="editorDataRef.darkTheme"
-        v-model:long-entry-price="modalDataRef.longEntryPrice"
-        v-model:long-stop-loss-price="modalDataRef.longStopLossPrice"
-        v-model:long-take-profit-price="modalDataRef.longTakeProfitPrice"
+          style="width: 100%;"
+          :code="modalDataRef.stockCode"
+          :chart-height="350"
+          :stock-name="modalDataRef.stockName"
+          :dark-theme="editorDataRef.darkTheme"
+          v-model:long-entry-price="modalDataRef.longEntryPrice"
+          v-model:long-stop-loss-price="modalDataRef.longStopLossPrice"
+          v-model:long-take-profit-price="modalDataRef.longTakeProfitPrice"
       />
     </n-card>
     <n-card size="small">
